@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"lucky-chen.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="背景Jetpack Compose 是Google推出的一个使用kotlin语言、声明式的UI框.  针对框架的PreCompose优化方案 通过PreCompose方案，深入compose的源码: 介绍有哪些模块, 有什么作用, 未来能做些什么">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Compose架构模块梳理">
+<meta property="og:url" content="https://lucky-chen.github.io/2023/02/15/compose/compose/index.html">
+<meta property="og:site_name" content="Chen&#39;s Notes">
+<meta property="og:description" content="背景Jetpack Compose 是Google推出的一个使用kotlin语言、声明式的UI框.  针对框架的PreCompose优化方案 通过PreCompose方案，深入compose的源码: 介绍有哪些模块, 有什么作用, 未来能做些什么">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/list_trace.JPEG">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/compose_ppl.PNG">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/precompose_ppl.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/compose_code_layer_demo.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/kotlin_compiler_flow.svg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/kotlin_compiler_fir.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/kotlin_compiler_ir.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/kotlin_compiler_fir_error_tips.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/kotlin_compiler_ir_api.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/compose_kcp.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/compose_env_prepare.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/snapshot_system.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/compose_init.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/compose_runtime_slotable.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/compose_change_list.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/compose_slotable_applier_layoutnode.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/precompose_ppl.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/compose_list.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/precompose_list.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/precompose_ayync_trace.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/snapshot_concurrent.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/SnapshotObserver.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/precompose_recompose_ppl.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/precompose_consume_change.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/recompose_paralel.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose/compose_cross_platform.png">
+<meta property="article:published_time" content="2023-02-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2023-04-12T15:17:44.439Z">
+<meta property="article:author" content="lucky_chen">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://lucky-chen.github.io/image/compose/list_trace.JPEG">
+
+<link rel="canonical" href="https://lucky-chen.github.io/2023/02/15/compose/compose/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Compose架构模块梳理 | Chen's Notes</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Chen's Notes</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://lucky-chen.github.io/2023/02/15/compose/compose/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="lucky_chen">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Chen's Notes">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Compose架构模块梳理
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-02-15 00:00:00" itemprop="dateCreated datePublished" datetime="2023-02-15T00:00:00+08:00">2023-02-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-04-12 23:17:44" itemprop="dateModified" datetime="2023-04-12T23:17:44+08:00">2023-04-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Compose/" itemprop="url" rel="index"><span itemprop="name">Compose</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p><a target="_blank" rel="noopener" href="https://developer.android.com/jetpack/compose?hl=zh-cn">Jetpack Compose</a> 是Google推出的一个使用kotlin语言、声明式的UI框.</p>
+<ul>
+<li>针对框架的PreCompose优化方案</li>
+<li>通过PreCompose方案，深入compose的源码: 介绍有哪些模块, 有什么作用, 未来能做些什么</li>
+</ul>
+<span id="more"></span>
+
+<h1 id="PreCompose方案简介"><a href="#PreCompose方案简介" class="headerlink" title="PreCompose方案简介"></a>PreCompose方案简介</h1><h2 id="问题分析"><a href="#问题分析" class="headerlink" title="问题分析"></a>问题分析</h2><figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//demo</span></span><br><span class="line"><span class="meta">@Composable</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">listContent</span><span class="params">()</span></span> &#123;</span><br><span class="line">        LazyColumn(modifier = Modifier.fillMaxSize()) &#123;</span><br><span class="line">            itemsIndexed( items = list, key = &#123; index, item -&gt; item.id &#125;) &#123; index, item -&gt;</span><br><span class="line">                Row &#123;</span><br><span class="line">                    Detail(item)</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>分析trace,5个主要步骤,几乎80%的耗时在compose和applychange这2两个步骤,围绕这两点探索优化方案<br><img src="/image/compose/list_trace.JPEG"></p>
+<h2 id="流程改造"><a href="#流程改造" class="headerlink" title="流程改造"></a>流程改造</h2><p><img src="/image/compose/compose_ppl.PNG"></p>
+<ol>
+<li>编译器编译,对@compose函数进行代码生成</li>
+<li>runtime调度运行compose函数</li>
+<li>compose结果写入slotable</li>
+<li>Apply compose执行过程中产生的change</li>
+<li>Layout measure draw</li>
+</ol>
+<p>PreCompose是将2和3的过程, 提前在另外一个线程运行 (类比前端框架的话, 大概可以理解为预先执行JS逻辑, 生成domtree?)</p>
+<p><img src="/image/compose/precompose_ppl.png"></p>
+<p>PreCompose方案改动涉及1到4的流程, 所以需要预先对compose有一定的了解, 下面会一边介绍compose内部原理、模块,一边介绍PreCompose的改造.</p>
+<h1 id="源码模块划分以及改造方案详解"><a href="#源码模块划分以及改造方案详解" class="headerlink" title="源码模块划分以及改造方案详解"></a>源码模块划分以及改造方案详解</h1><h2 id="1-分层-模块设计"><a href="#1-分层-模块设计" class="headerlink" title="1. 分层/模块设计"></a>1. 分层/模块设计</h2><p><a target="_blank" rel="noopener" href="https://developer.android.com/jetpack/compose/layering">Jetpack Compose architectural layering</a>, 由上到下架构总共分为5层,每层又包含不同的模块,举个实际代码的例</p>
+<p><img src="/image/compose/compose_code_layer_demo.png"></p>
+<ul>
+<li>Material: 提供了 Material Design 的实现组件<ul>
+<li>Android 平台上的特定能力， 比如组件库，主题等</li>
+</ul>
+</li>
+<li>Foundation :  与设计系统无关的组件、能力<ul>
+<li>Row  行布局</li>
+<li>LazyList 列表组件 (组件适配)</li>
+<li>特定手势识别</li>
+</ul>
+</li>
+<li>UI: 界面工具包的基本组件<ul>
+<li>输入事件处理</li>
+<li>布局:LayoutNode</li>
+<li>绘图(RenderNodeLayer  DisplayList canvas)</li>
+<li>Modifer : 对 UI 效果进行一些修饰或添加行为，类似css </li>
+</ul>
+</li>
+<li>Runtime :  Compose 运行时的基本环境、组件<ul>
+<li>Snapshot  :  Compose 通过名为“快照（Snapshot）”的系统撑状态(State )管理与重组机制的运行</li>
+<li>Composable functions: 基本组成单元, 唯一目的就是构建一颗 Composition tree</li>
+<li>SlotTable: 数据结构,记录CompositionTree(包括节点tree、位置记忆、参数、remembered values等等)</li>
+<li>Recomposer 处理由于state更改导致的重新compose</li>
+</ul>
+</li>
+<li>Compiler  The Road to the K2 Compiler | The Kotlin Blog<ul>
+<li>基于KCP(kotlin compile plugin)，针对compose特性编写的编译器插件, 其中前端编译部分做语法、静态检查，后端编译操作IR做Compose代码的转换<br>PreCompose的改造涉及2个模块</li>
+</ul>
+</li>
+<li>Runtime : 修改composeinit和recompose的运行时许、协程调度</li>
+<li>Foundation : 适配lazylist组件 (item 单独compose处理)</li>
+</ul>
+<h2 id="2-Compose-Compiler-Plugin"><a href="#2-Compose-Compiler-Plugin" class="headerlink" title="2. Compose Compiler Plugin"></a>2. Compose Compiler Plugin</h2><p>基于KCP(kotlin compile plugin),compose 开发了一个用于compose的插件， 分别在前端编译和后端编译阶段进行一些逻辑处理 </p>
+<h3 id="2-1-Kotlin-k2编译器"><a href="#2-1-Kotlin-k2编译器" class="headerlink" title="2.1 Kotlin k2编译器"></a>2.1 Kotlin k2编译器</h3><p><a target="_blank" rel="noopener" href="https://blog.jetbrains.com/kotlin/2021/10/the-road-to-the-k2-compiler/">The Road to the K2 Compiler | The Kotlin Blog</a></p>
+<p><img src="/image/compose/kotlin_compiler_flow.svg"></p>
+<h4 id="Frontend（编译器前端）-ide插件复用"><a href="#Frontend（编译器前端）-ide插件复用" class="headerlink" title="Frontend（编译器前端）  ide插件复用"></a>Frontend（编译器前端）  ide插件复用</h4><p><img src="/image/compose/kotlin_compiler_fir.png"></p>
+<ul>
+<li>提升前端静态分析&amp;&amp;检查的性能 (比如频繁修改局部代码, 基于FIR做了大量性能优化)</li>
+<li>做一些简单的脱糖&amp;&amp;代码生成工作</li>
+</ul>
+<h4 id="Backend（编译器后端）"><a href="#Backend（编译器后端）" class="headerlink" title="Backend（编译器后端）"></a>Backend（编译器后端）</h4><p>基于IR等产物，代码生成、优化、生成平台目标代码<br><img src="/image/compose/kotlin_compiler_ir.png"></p>
+<h3 id="2-2-Compose的编译插件"><a href="#2-2-Compose的编译插件" class="headerlink" title="2.2 Compose的编译插件"></a>2.2 Compose的编译插件</h3><p>Compose编译和runtime阶段是互相配合的, 编译器根据runtime的一些规则、逻辑, 分析@Compose函数代码,进行代码生成</p>
+<ul>
+<li>Compose Compiler(1) kotlin编译架构&amp;&amp;KCP </li>
+<li>Compose Compiler(2): Compose plugin </li>
+</ul>
+<p>Compose Compiler 是一个 KCP, 核心在于其实现逻辑的Extension . 入口在<a target="_blank" rel="noopener" href="https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:compose/compiler/compiler-hosted/src/main/java/androidx/compose/compiler/plugins/kotlin/ComposePlugin.kt">ComposePlugin.kt</a></p>
+<h4 id="2-2-1-前端编译"><a href="#2-2-1-前端编译" class="headerlink" title="2.2.1 前端编译"></a>2.2.1 前端编译</h4><figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">ComposeComponentRegistrar</span> : <span class="type">ComponentRegistrar</span> &#123;</span><br><span class="line">    <span class="comment">//frontend 部分, ide</span></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">registerCommonExtensions</span><span class="params">(project: <span class="type">Project</span>)</span></span> &#123;</span><br><span class="line">        StorageComponentContainerContributor.registerExtension(project,</span><br><span class="line">            <span class="comment">//检查是否可以调用 @Composable 函数</span></span><br><span class="line">            ComposableCallChecker()</span><br><span class="line">        )</span><br><span class="line">        StorageComponentContainerContributor.registerExtension(project,</span><br><span class="line">            <span class="comment">//检查 @Composable 的位置是否正确</span></span><br><span class="line">            ComposableDeclarationChecker()</span><br><span class="line">        )</span><br><span class="line">        <span class="comment">//...</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a target="_blank" rel="noopener" href="https://android.googlesource.com/platform/frameworks/support/+/d9b093e6c6ae29e35c003f9b2733d032b8dacddf/compose/compiler/compiler-hosted/src/main/java/androidx/compose/compiler/plugins/kotlin/ComposeErrorMessages.kt">ComposeErrorMessages.kt</a></p>
+<p><img src="/image/compose/kotlin_compiler_fir_error_tips.png"></p>
+<h4 id="2-2-2-后端编译"><a href="#2-2-2-后端编译" class="headerlink" title="2.2.2 后端编译"></a>2.2.2 后端编译</h4><p>操作IR的Transformer， 一层一层lower，直到汇编机器码级别<br><img src="/image/compose/kotlin_compiler_ir_api.png"></p>
+<p>compose逻辑<br><img src="/image/compose/compose_kcp.png"></p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">ComposeIrGenerationExtension</span>(...) : IrGenerationExtension &#123;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">generate</span><span class="params">(moduleFragment: <span class="type">IrModuleFragment</span>,pluginContext: <span class="type">IrPluginContext</span>)</span></span> &#123;</span><br><span class="line">      </span><br><span class="line">        <span class="comment">//判断类型稳定性并针对稳定类型生成跳过重组的对应代码</span></span><br><span class="line">        ClassStabilityTransformer(pluginContext).lower(moduleFragment)</span><br><span class="line">        ComposerLambdaMemoization(pluginContext).lower(moduleFragment)</span><br><span class="line">        <span class="comment">//...</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// transform all composable functions to have an extra synthetic composer</span></span><br><span class="line">        <span class="comment">// parameter. this will also transform all types and calls to include the extra</span></span><br><span class="line">        <span class="comment">// parameter.</span></span><br><span class="line">        <span class="comment">//为@Composable 函数增加 $compsoer 等参数</span></span><br><span class="line">        ComposerParamTransformer(pluginContext).lower(moduleFragment)</span><br><span class="line">        <span class="comment">//内部调用: composerParam = fn.addValueParameter（...）</span></span><br><span class="line">         </span><br><span class="line">        <span class="comment">//非常复杂的一个trasnfromer, Composable 函数体内生成 startXXXGroup/endXXXGroup/recompose 等相关代码</span></span><br><span class="line">        <span class="comment">//This IR Transform is responsible for the main transformations of the body of a composable function.</span></span><br><span class="line">        <span class="comment">//1. Control-Flow Group Generation</span></span><br><span class="line">        <span class="comment">//2. Default arguments</span></span><br><span class="line">        <span class="comment">//3. Composable Function Skipping</span></span><br><span class="line">        <span class="comment">//4. Comparison Propagation</span></span><br><span class="line">        <span class="comment">//5. Recomposability</span></span><br><span class="line">        <span class="comment">//6. Source location information (when enabled)</span></span><br><span class="line">        ComposableFunctionBodyTransformer(pluginContext).lower(moduleFragment)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (isKlibTarget) &#123; &#125;</span><br><span class="line">        <span class="keyword">if</span> (pluginContext.platform.isJs()) &#123;&#125;   </span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li>将 Compose 代码以 Group 为单位，进行切块 (符合Slottable的规则, 运行期写入)</li>
+<li>加入一些 change 的判断逻辑来 skip 不需要重复执行的 Group （重组是乐观的）</li>
+<li>IR 阶段注入的 $composer 连接了开发者编写的 Composable functions 和 Compose runtime。</li>
+<li>… 其它复杂的逻辑</li>
+</ol>
+<h3 id="2-3-我们可以做什么（编译优化）"><a href="#2-3-我们可以做什么（编译优化）" class="headerlink" title="2.3 我们可以做什么（编译优化）"></a>2.3 我们可以做什么（编译优化）</h3><ul>
+<li>前端fir （ide 插件复用）<ul>
+<li>静态语法、语义分析:  coding最佳实践提示</li>
+<li>最佳实践：state作用域 </li>
+</ul>
+</li>
+<li>后端ir<ul>
+<li>代码插入： 代码覆盖率热点代码统计, 特殊逻辑</li>
+<li>优化：指令精简(包体积)、compose 逻辑优化（skip、复用）</li>
+</ul>
+</li>
+</ul>
+<h2 id="3-Compose运行阶段"><a href="#3-Compose运行阶段" class="headerlink" title="3. Compose运行阶段"></a>3. Compose运行阶段</h2><figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">MyComposeView2</span> <span class="meta">@JvmOverloads</span> <span class="keyword">constructor</span>(context: Context) </span><br><span class="line">   : AbstractComposeView(context) &#123;</span><br><span class="line">  </span><br><span class="line">    <span class="meta">@Composable</span></span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">Content</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="keyword">var</span> count <span class="keyword">by</span> remember &#123; mutableStateOf(<span class="number">1</span>) &#125;</span><br><span class="line">        Button(onClick = &#123; </span><br><span class="line">            count++ </span><br><span class="line">        &#125;)&#123;</span><br><span class="line">            Text(text = <span class="string">&quot;count <span class="variable">$count</span>&quot;</span>)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li>Env prepare : 创建相关对象,注册相关observer</li>
+<li>Compose : 执行compose函数、applychange</li>
+<li>measure、layout、draw</li>
+<li>Recompose : 触发recompose</li>
+</ol>
+<h3 id="3-1-Step1-Compose-Env-Prepare"><a href="#3-1-Step1-Compose-Env-Prepare" class="headerlink" title="3.1 Step1: Compose Env Prepare"></a>3.1 Step1: Compose Env Prepare</h3><p><img src="/image/compose/compose_env_prepare.png"></p>
+<ul>
+<li>创建AbstractComposeView, 初始化平台相关lifecycle,关联compose生命周期,持有根@compose函数 Content</li>
+<li>创建 AndroidComposeView 用于measure、layout、draw</li>
+<li>初始化Composition &amp;&amp; Slottable</li>
+<li>初始化 Recomposer<ul>
+<li>向GlobalSnapshot注册observer, 记录state的变更和state所属的scope</li>
+<li>开启一个协程, 观察state改变,从而触发重组</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-2-Step2-ComposeRuntime"><a href="#3-2-Step2-ComposeRuntime" class="headerlink" title="3.2 Step2: ComposeRuntime"></a>3.2 Step2: ComposeRuntime</h3><h4 id="3-2-1-Snapshot-system"><a href="#3-2-1-Snapshot-system" class="headerlink" title="3.2.1 Snapshot system"></a>3.2.1 Snapshot system</h4><p>Snapshot 系统作为Comppose的一个核心底层设施，可以脱离 Compose UI 单独使用, 支撑状态管理与重组机制的运行 <a target="_blank" rel="noopener" href="https://dev.to/zachklipp/introduction-to-the-compose-snapshot-system-19cn">Introduction to the Compose Snapshot system</a> ,  是一个 MVCC 系统的实现, 全称 Multiversion Concurrency Control （多版本并发控制），常用于数据库管理系统，实现事务并发 ,其模型与 Git 分支管理系统也有点类似. 有以下特性</p>
+<p><img src="/image/compose/snapshot_system.png"></p>
+<ul>
+<li>Mutablesnapshot /GlobalSnapshot</li>
+<li>Isolation: 访问隔离</li>
+<li>快照修改、提交</li>
+<li>冲突解决</li>
+<li>响应式状态读写感知</li>
+<li>并发与冲突解决 </li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">  <span class="keyword">val</span> count = mutableStateOf(<span class="number">1</span>) <span class="comment">//globalSnapshot      git main</span></span><br><span class="line">  </span><br><span class="line">  <span class="keyword">val</span> readObserver: (Any) -&gt; <span class="built_in">Unit</span> = &#123; readState -&gt;</span><br><span class="line">      println(<span class="string">&quot;state was read&quot;</span>)</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">val</span> writeObserver: (Any) -&gt; <span class="built_in">Unit</span> = &#123; writtenState -&gt;</span><br><span class="line">      println(<span class="string">&quot;state was written&quot;</span>)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">val</span> snapshot = Snapshot.takeMutableSnapshot(readObserver,writeObserver)   <span class="comment">//git checkout</span></span><br><span class="line">  println(count)    <span class="comment">// 1</span></span><br><span class="line">  </span><br><span class="line">  snapshot.enter &#123;</span><br><span class="line">    count = <span class="number">2</span>        <span class="comment">//edit in new branch.  Isolation</span></span><br><span class="line">    println(count)   <span class="comment">//2</span></span><br><span class="line">    <span class="comment">//compose func</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">//snapshot.apply() //git merge 1,2,2</span></span><br><span class="line">  </span><br><span class="line">  println(count)   <span class="comment">//1 or 2 =====&gt; apply? 2: 1   Isolation&amp;&amp; apply</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="3-2-2-Compose-env"><a href="#3-2-2-Compose-env" class="headerlink" title="3.2.2 Compose env"></a>3.2.2 Compose env</h4><p>demo</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">MyComposeView</span> <span class="meta">@JvmOverloads</span> <span class="keyword">constructor</span>(...)) : AbstractComposeView(...) &#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Composable</span></span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">Content</span><span class="params">()</span></span> &#123;</span><br><span class="line">        TestContent()</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>最终会调用到composeInitial函数中,Content函数作为参数传递过来</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//Recomposer.kt</span></span><br><span class="line"><span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">composeInitial</span><span class="params">(composition:<span class="type">ControlledComposition</span>,content: @<span class="type">Composable</span> () -&gt; <span class="type">Unit</span>)</span></span> &#123;</span><br><span class="line"> </span><br><span class="line">    composing(composition, <span class="literal">null</span>) &#123;              <span class="comment">//1</span></span><br><span class="line">        composition.composeContent(content)     <span class="comment">//2</span></span><br><span class="line">    &#125;</span><br><span class="line">    Snapshot.notifyObjectsInitialized()        <span class="comment">//3</span></span><br><span class="line">    composition.applyChanges()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">inline</span> <span class="function"><span class="keyword">fun</span> <span class="type">&lt;T&gt;</span> <span class="title">composing</span><span class="params">(composition,modifiedValues,block: () -&gt; <span class="type">T</span>)</span></span>: T &#123;</span><br><span class="line">    <span class="keyword">val</span> snapshot = Snapshot.takeMutableSnapshot(  <span class="comment">//1.1</span></span><br><span class="line">        readObserverOf(composition), writeObserverOf(composition, modifiedValues)</span><br><span class="line">    )</span><br><span class="line">    snapshot.enter(block)     <span class="comment">//1.2</span></span><br><span class="line">    applyAndCheck(snapshot).  <span class="comment">//1.3</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">CompositionImpl</span>() &#123;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">recordReadOf</span><span class="params">(value: <span class="type">Any</span>)</span></span> &#123;</span><br><span class="line">        composer.currentRecomposeScope?.let &#123; observations.add(value, it) &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">recordWriteOf</span><span class="params">(value: <span class="type">Any</span>)</span></span> = synchronized(lock) &#123;</span><br><span class="line">        invalidateScopeOfLocked(value)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><img src="/image/compose/compose_init.png"></p>
+<ol>
+<li>从GlobalSnapshot派生一个mutablesnapshot， 在mutablesnapshot中执行content组合函数 (并行化compose的基础之一) </li>
+<li>执行compose函数， 产生button、text节点以及state等信息, 结果记录在slottable上</li>
+</ol>
+<p><img src="/image/compose/compose_runtime_slotable.png"></p>
+<ol start="3">
+<li>compose中产生的change记录在changeList上，下个阶段applychange调用</li>
+<li>合并state变动调用snapshot.apply </li>
+</ol>
+<ul>
+<li>合并状态更改: 回掉globalsnapshot 的observer， 将mutablesnapshot中state的改动merge回globalsnapshot上</li>
+<li>记录被更改的composition: Map&lt;State,Composition&gt;</li>
+</ul>
+<ol start="5">
+<li>调用composition的applychange, composition执行changelist<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">composition.applyChanges()</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h3 id="3-3-Step3-ApplyChange"><a href="#3-3-Step3-ApplyChange" class="headerlink" title="3.3 Step3: ApplyChange"></a>3.3 Step3: ApplyChange</h3><p>在compose函数执行过程中，产生了非常多的change，在这一步会apply各种change</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">applyChangesInLocked</span><span class="params">(changes: <span class="type">MutableList</span>&lt;<span class="type">Change</span>&gt;)</span></span> &#123;</span><br><span class="line">    applier.onBeginChanges()</span><br><span class="line">    slotTable.write &#123; slots -&gt;</span><br><span class="line">        changes.fastForEach &#123; change -&gt;</span><br><span class="line">            change(applier, slots, manager)</span><br><span class="line">    &#125;    </span><br><span class="line">    applier.onEndChanges()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这些change是什么呢<br><img src="/image/compose/compose_change_list.png"></p>
+<ul>
+<li>Sideeffect</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Compose</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">Widget</span><span class="params">()</span></span>&#123;</span><br><span class="line">    print(<span class="string">&quot;phase: compose !&quot;</span>)</span><br><span class="line">    <span class="keyword">val</span> strat = time.current()</span><br><span class="line">    SideEffect &#123;</span><br><span class="line">        <span class="comment">//timing, compose done || node create end.   //change 0</span></span><br><span class="line">        <span class="keyword">val</span> timeCost = time.current() - start</span><br><span class="line">        print(<span class="string">&quot;phase: applychange ! time diff: <span class="variable">$timeCost</span>&quot;</span>) </span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>创建、更新节点</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//text</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">Text</span><span class="params">()</span></span>&#123;</span><br><span class="line">    ReusableComposeNode(....)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">ReusableComposeNode&lt;ComposeUiNode, Applier&lt;Any&gt;&gt;(</span><br><span class="line">    factory = ComposeUiNode.Constructor,  <span class="comment">//change 1. create node</span></span><br><span class="line">    update = &#123;</span><br><span class="line">        <span class="keyword">set</span>(density, ComposeUiNode.SetDensity). <span class="comment">//change2 update node</span></span><br><span class="line">        <span class="keyword">set</span>(layoutDirection, ComposeUiNode.SetLayoutDirection) </span><br><span class="line">    &#125;,</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">AndroidView(modifier = Modifier.width(<span class="number">60.</span>dp), </span><br><span class="line">    factory = &#123; ctx -&gt;                                </span><br><span class="line">        ImageView(ctx).apply &#123; setImageDrawable(d) &#125;  <span class="comment">//change 3. create androidview </span></span><br><span class="line">    &#125;, update = &#123;                                     </span><br><span class="line">         it.startAnimation()                         <span class="comment">//change 4. update androidview </span></span><br><span class="line">    &#125;</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>操作Applier</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//composer.kt</span></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">realizeUps</span><span class="params">()</span></span> &#123;</span><br><span class="line">    record &#123; applier, _, _ -&gt;</span><br><span class="line">        repeat(count) &#123; applier.up() &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">Applier</span>&lt;<span class="type">N</span>&gt; &#123;</span><br><span class="line">    <span class="keyword">val</span> current: N</span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">onBeginChanges</span><span class="params">()</span></span> &#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">onEndChanges</span><span class="params">()</span></span> &#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">down</span><span class="params">(node: <span class="type">N</span>)</span></span></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">up</span><span class="params">()</span></span></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">insertTopDown</span><span class="params">(index: <span class="type">Int</span>, instance: <span class="type">N</span>)</span></span></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">insertBottomUp</span><span class="params">(index: <span class="type">Int</span>, instance: <span class="type">N</span>)</span></span></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">remove</span><span class="params">(index: <span class="type">Int</span>, count: <span class="type">Int</span>)</span></span></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">move</span><span class="params">(from: <span class="type">Int</span>, to: <span class="type">Int</span>, count: <span class="type">Int</span>)</span></span></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">clear</span><span class="params">()</span></span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>SlotTable 中的状态不能直接用来渲染，通过 Applier 转换成渲染树NodeTree</p>
+<p><img src="/image/compose/compose_slotable_applier_layoutnode.png"></p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//android</span></span><br><span class="line"><span class="keyword">internal</span> <span class="keyword">class</span> <span class="title class_">UiApplier</span>(root: LayoutNode) : AbstractApplier&lt;LayoutNode&gt;(root) &#123;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">insertTopDown</span><span class="params">(index: <span class="type">Int</span>, instance: <span class="type">LayoutNode</span>)</span></span> &#123;&#125;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">insertBottomUp</span><span class="params">(index: <span class="type">Int</span>, instance: <span class="type">LayoutNode</span>)</span></span> &#123;</span><br><span class="line">        current.insertAt(index, instance)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">remove</span><span class="params">(index: <span class="type">Int</span>, count: <span class="type">Int</span>)</span></span> &#123;</span><br><span class="line">        current.removeAt(index, count)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">move</span><span class="params">(from: <span class="type">Int</span>, to: <span class="type">Int</span>, count: <span class="type">Int</span>)</span></span> &#123;</span><br><span class="line">        current.move(from, to, count)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">onClear</span><span class="params">()</span></span> &#123;</span><br><span class="line">        root.removeAll()</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">onEndChanges</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="keyword">super</span>.onEndChanges()</span><br><span class="line">        root.owner?.onEndApplyChanges()</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! <br><br>这里是不是很有趣,完全可以自己实现一套自定义的LayoutNode, 跨平台渲染能力 <br><br>!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!</p>
+</blockquote>
+<h3 id="3-4-我们能做什么？PreCompose性能优化方案详解"><a href="#3-4-我们能做什么？PreCompose性能优化方案详解" class="headerlink" title="3.4 我们能做什么？PreCompose性能优化方案详解"></a>3.4 我们能做什么？PreCompose性能优化方案详解</h3><p>前面讲过, 从性能trace上看, compose和applychange两部分耗时几乎占了80%+,如果要优化首帧,必须想办法解决compose和applychange两部分的消耗</p>
+<ul>
+<li>Compose:  运行compose函数, 根据状态和运行过程, 生成slottable, 记录changes</li>
+<li>Applychange: 运行上一步记录的changs (生成node、回掉node的update函数, 更新layoutnode、其他callback)</li>
+</ul>
+<p>理论上可以把compose和Applychange两部分提前执行. </p>
+<p>但是考虑到实际场景, 通常提前执行是在异步线程中, 而Applychange涉及到(AndroidView)的操作,异步破坏了流程设计.  所以, 最后决定将compose部分提前多线程执行<br>由于初期不确定方案的改造范围和实际coding风险,  分为3步逐步改造验证</p>
+<ol>
+<li>在UI线程PreCompose一个常规组件的页面 (row、text、button)</li>
+<li>在ui线程PreCompose一个具备特殊组件的页面(lazylist)</li>
+<li>重复1和2, 将PreCompose放到多线程下执行</li>
+</ol>
+<h4 id="3-4-1-UI线程Precompose"><a href="#3-4-1-UI线程Precompose" class="headerlink" title="3.4.1 UI线程Precompose"></a>3.4.1 UI线程Precompose</h4><p>如上所示， compose 后的结果一个是slottable， 一个是list<change>,只需要在applychange这一步切一刀</p>
+<p><img src="/image/compose/precompose_ppl.png"></p>
+<p>api设计</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">abstract</span> <span class="keyword">class</span> <span class="title class_">AbstractPreComposeView</span> <span class="meta">@JvmOverloads</span> <span class="keyword">constructor</span>()     </span><br><span class="line">   <span class="function"><span class="keyword">fun</span> <span class="title">preComposeContent</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="comment">//prepare compose env</span></span><br><span class="line">        initPreComposeOnUiThread()</span><br><span class="line">        <span class="comment">//run composeinit</span></span><br><span class="line">        callComposeContent()</span><br><span class="line">     &#125;</span><br><span class="line"> &#125; </span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>提前处理好各种lifecycle的绑定和触发时机 (Android和activeity/fragment绑定的一些lifecycle)</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">abstract</span> <span class="keyword">class</span> <span class="title class_">AbstractPreComposeView</span> <span class="meta">@JvmOverloads</span> <span class="keyword">constructor</span>()     </span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">initPreComposeOnUiThread</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="comment">//bind wrap lifecycle</span></span><br><span class="line">        delegateLifecycleOwner.registry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)</span><br><span class="line">        <span class="comment">//make composition &amp;&amp; register lifecycle</span></span><br><span class="line">        ensureCompositionCreated()</span><br><span class="line">        composition?.isAsyncCompose = <span class="literal">true</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment">//prepare composition</span></span><br><span class="line">        composeView?.initLifeCycleEnv()</span><br><span class="line">        composeView?.invokeOnViewTreeOwnersAvailable()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">     <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">onAttachedToWindow</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="comment">//lifecycle处理</span></span><br><span class="line">        delegateSavedStateOwner.originOwner = realSavedStateRegistryOwner</span><br><span class="line">        ViewTreeLifecycleOwner.<span class="keyword">set</span>(<span class="keyword">this</span>, delegateLifecycleOwner)</span><br><span class="line">        setViewTreeSavedStateRegistryOwner(delegateSavedStateOwner)</span><br><span class="line">        <span class="keyword">super</span>.onAttachedToWindow()</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>驱动Compose函数的执行</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">abstract</span> <span class="keyword">class</span> <span class="title class_">AbstractPreComposeView</span> <span class="meta">@JvmOverloads</span> <span class="keyword">constructor</span>()  </span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">callComposeContent</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="comment">//触发composeInit</span></span><br><span class="line">        composeEventObserver.onStateChanged(delegateLifecycleOwner,Lifecycle.Event.ON_CREATE)</span><br><span class="line">        block?.let &#123; it() &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>上屏时,只需要执行<code>ApplyChange</code>驱动后续的流程: 将slottable和list<change>的变动apply</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">abstract</span> <span class="keyword">class</span> <span class="title class_">AbstractPreComposeView</span> <span class="meta">@JvmOverloads</span> <span class="keyword">constructor</span>()     </span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">initPreComposeOnUiThread</span><span class="params">()</span></span> &#123;</span><br><span class="line">        composeView?.calledwhenAttachToWindow = &#123;</span><br><span class="line">            uiDispatcher?.postFrameCallback &#123;</span><br><span class="line">                <span class="comment">//上屏时驱动applyAsyncComposeChange</span></span><br><span class="line">               composition?.applyAsyncComposeChange()</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h4 id="3-4-2-List-Item-Precompose"><a href="#3-4-2-List-Item-Precompose" class="headerlink" title="3.4.2 List Item Precompose"></a>3.4.2 List Item Precompose</h4><p>普通组件这么写是ok的,但是如果有特殊组件如列表, 这样还不够</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Composable</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">listContent</span><span class="params">()</span></span> &#123;</span><br><span class="line">   <span class="comment">// CompositionLocalProvider(LocalPreComposeItemCount provides 10) &#123;</span></span><br><span class="line">        LazyColumn(modifier = Modifier.fillMaxSize()) &#123;</span><br><span class="line">            itemsIndexed( items = list, key = &#123; index, item -&gt; item.id &#125;) &#123; index, item -&gt;</span><br><span class="line">                androidViewItem(item)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">   <span class="comment">// &#125;</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>上面那种,只能触发最外层的Composition的逻辑, 列表每一个Item是一个subcompositon, 是在measure阶段触发的,需要适配</li>
+</ul>
+<p><img src="/image/compose/compose_list.png"></p>
+<p>处理好compose、applychange、measure的时序</p>
+<ul>
+<li><p><code>lazyList</code></p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">internal</span> <span class="keyword">class</span> <span class="title class_">LazyLayoutMeasureScopeImpl</span> <span class="keyword">internal</span> <span class="keyword">constructor</span>() &#123;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">measure</span><span class="params">(index: <span class="type">Int</span>, constraints: <span class="type">Constraints</span>)</span></span>: List&lt;Placeable&gt; &#123;</span><br><span class="line">        <span class="comment">//val cachedPlaceable = placeablesCache[index]</span></span><br><span class="line">        <span class="keyword">val</span> key = itemContentFactory.itemProvider().getKey(index)</span><br><span class="line">        <span class="keyword">val</span> itemContent = itemContentFactory.getContent(index, key)</span><br><span class="line">            <span class="comment">//compose</span></span><br><span class="line">        <span class="keyword">val</span> measurables = subcomposeMeasureScope.subcompose(key, itemContent)</span><br><span class="line">            <span class="comment">//measure</span></span><br><span class="line">        List(measurables.size) &#123; i -&gt; measurables[i].measure(constraints)&#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">subcompose</span><span class="params">(slotId: <span class="type">Any</span>?, content: @<span class="type">Composable</span> () -&gt; <span class="type">Unit</span>)</span></span>: List&lt;Measurable&gt; &#123;</span><br><span class="line">    subcompose(node, slotId, content) <span class="comment">//=&gt; subcomposeInto</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"> <span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">subcomposeInto</span><span class="params">(composable: @<span class="type">Composable</span> () -&gt; <span class="type">Unit</span>)</span></span>: Composition &#123;</span><br><span class="line">    <span class="keyword">return</span> createSubcomposition(container, parent).apply &#123;</span><br><span class="line">            isAsyncCompose = asyncCompose</span><br><span class="line">            setContent(composable)</span><br><span class="line">    &#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure></li>
+<li><p>在外层compose阶段, 收集list item的信息</p>
+</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Composable</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">LazyLayout</span><span class="params">(...)</span></span>&#123;</span><br><span class="line">    SubcomposeLayout(subcomposeLayoutState,itemContentFactory,measurePolicy)</span><br><span class="line">    <span class="keyword">val</span> preComposeItemCount = LocalPreComposeItemCount.current</span><br><span class="line">    parentView.composeblock = &#123;</span><br><span class="line">        <span class="keyword">for</span> (index <span class="keyword">in</span> <span class="number">0</span> until preComposeItemCount) &#123;</span><br><span class="line">            <span class="keyword">val</span> key = itemContentFactory.itemProvider().getKey(index)</span><br><span class="line">            <span class="keyword">val</span> contentItem = itemContentFactory.getContent(index, key)</span><br><span class="line">            subcomposeLayoutState.asyncComposeInit(key, contentItem)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>在外层compose执行完后, 预执行list的items的compose</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//subcomposeLayoutState</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">asyncComposeInit</span><span class="params">(slotId: <span class="type">Any</span>?, content: @<span class="type">Composable</span> () -&gt; <span class="type">Unit</span>)</span></span> &#123;</span><br><span class="line">    precompose(slotId, content)</span><br><span class="line">    asyncComposeRegister.add(slotId)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">precompose</span><span class="params">(slotId: <span class="type">Any</span>?, content: @<span class="type">Composable</span> () -&gt; <span class="type">Unit</span>)</span></span>: PrecomposedSlotHandle &#123;</span><br><span class="line">    makeSureStateIsConsistent()</span><br><span class="line">    <span class="keyword">if</span> (!slotIdToNode.containsKey(slotId)) &#123;</span><br><span class="line">        <span class="keyword">val</span> node = precomposeMap.getOrPut(slotId) &#123;</span><br><span class="line">            <span class="keyword">val</span> reusedNode = takeNodeFromReusables(slotId)</span><br><span class="line">            <span class="keyword">if</span> (reusedNode != <span class="literal">null</span>) &#123;</span><br><span class="line">                <span class="comment">// now move this node to the end where we keep precomposed items</span></span><br><span class="line">                precomposedCount++</span><br><span class="line">                reusedNode</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                createNodeAt(root.foldedChildren.size).also &#123;precomposedCount++&#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        subcompose(node, slotId, content)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">object</span> : PrecomposedSlotHandle &#123;」</span><br><span class="line">&#125;  </span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>第一次measureItems时,执行各个子compostion的applychange</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">subcompose</span><span class="params">(slotId: <span class="type">Any</span>?, content: @<span class="type">Composable</span> () -&gt; <span class="type">Unit</span>)</span></span>: List&lt;Measurable&gt; &#123;</span><br><span class="line">    applyAsyncAllComposeChange()</span><br><span class="line">    <span class="keyword">val</span> node = slotIdToNode.getOrPut(slotId) &#123;</span><br><span class="line">        <span class="keyword">val</span> precomposed = precomposeMap.remove(slotId)</span><br><span class="line">        <span class="keyword">if</span> (precomposed != <span class="literal">null</span>) &#123;</span><br><span class="line">            precomposed</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            takeNodeFromReusables(slotId) ?: createNodeAt(currentIndex)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//subcompose(node, slotId, content) //=&gt; subcomposeInto</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">applyAsyncAllComposeChange</span><span class="params">()</span></span> &#123;</span><br><span class="line">    asyncComposeRegister.forEach &#123;</span><br><span class="line">        <span class="keyword">val</span> preComposedNode = precomposeMap[it]</span><br><span class="line">        <span class="keyword">val</span> nodeState = nodeToNodeState[preComposedNode]</span><br><span class="line">        <span class="keyword">val</span> cmp = nodeState?.composition</span><br><span class="line">        <span class="keyword">if</span> ((nodeState?.isAsyncCompose == <span class="literal">true</span>) &amp;&amp; (cmp != <span class="literal">null</span>) &amp;&amp; cmp.isAsyncCompose) &#123;</span><br><span class="line">            cmp.applyAsyncComposeChange()</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    asyncComposeRegister.clear()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><img src="/image/compose/precompose_list.png"></p>
+<h4 id="3-4-3-Compose异步化方案"><a href="#3-4-3-Compose异步化方案" class="headerlink" title="3.4.3 Compose异步化方案"></a>3.4.3 Compose异步化方案</h4><ul>
+<li>Compose函数 </li>
+<li>Snapshot</li>
+<li>Slottable</li>
+</ul>
+<p><img src="/image/compose/precompose_ayync_trace.png"></p>
+<h5 id="compose函数是否支持并行-异步-函数式"><a href="#compose函数是否支持并行-异步-函数式" class="headerlink" title="compose函数是否支持并行/异步? (函数式)"></a>compose函数是否支持并行/异步? (函数式)</h5><ul>
+<li><a target="_blank" rel="noopener" href="https://developer.android.com/jetpack/compose/mental-model#any-order">Composable functions can execute in any order</a></li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Composable</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">ButtonRow</span><span class="params">()</span></span> &#123;</span><br><span class="line">    MyFancyNavigation &#123;</span><br><span class="line">        StartScreen()   <span class="comment">// compose func 1</span></span><br><span class="line">        MiddleScreen()  <span class="comment">// compose func 2</span></span><br><span class="line">        EndScreen()     <span class="comment">// compose func 3</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//exectute order 1-2-3 or 1-3-2 or 2-3-1 or 3-2-1</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><a target="_blank" rel="noopener" href="https://developer.android.com/jetpack/compose/mental-model#parallel">Composable functions can run in parallel</a></li>
+</ul>
+<blockquote>
+<p>Compose can optimize recomposition by running composable functions in parallel. This lets Compose take advantage of multiple cores, and run composable functions not on the screen at a lower priority. This optimization means a composable function might execute within a pool of background threads</p>
+</blockquote>
+<h5 id="State-Snapshot是否支持多线程"><a href="#State-Snapshot是否支持多线程" class="headerlink" title="State/Snapshot是否支持多线程?"></a>State/Snapshot是否支持多线程?</h5><p>Compose 通过名为“快照（Snapshot）”的系统支撑状态管理与重组机制的运行 ,多线程的支持</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">internal</span> <span class="keyword">actual</span> <span class="keyword">class</span> <span class="title class_">SnapshotThreadLocal</span>&lt;<span class="type">T</span>&gt; &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">val</span> map = AtomicReference&lt;ThreadMap&gt;(emptyThreadMap)</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">val</span> writeMutex = Any()</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Suppress(<span class="string">&quot;UNCHECKED_CAST&quot;</span>)</span></span><br><span class="line">    <span class="keyword">actual</span> <span class="function"><span class="keyword">fun</span> <span class="title">get</span><span class="params">()</span></span>: T? = map.<span class="keyword">get</span>().<span class="keyword">get</span>(Thread.currentThread().id) <span class="keyword">as</span> T?</span><br><span class="line"></span><br><span class="line">    <span class="keyword">actual</span> <span class="function"><span class="keyword">fun</span> <span class="title">set</span><span class="params">(value: <span class="type">T</span>?)</span></span> &#123;</span><br><span class="line">        <span class="keyword">val</span> key = Thread.currentThread().id</span><br><span class="line">        synchronized(writeMutex) &#123;</span><br><span class="line">            <span class="keyword">val</span> current = map.<span class="keyword">get</span>()</span><br><span class="line">            <span class="keyword">if</span> (current.trySet(key, value)) <span class="keyword">return</span></span><br><span class="line">            map.<span class="keyword">set</span>(current.newWith(key, value))</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><img src="/image/compose/snapshot_concurrent.png"></p>
+<p>如果state发生了冲突,提供了merge判断的接口</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Dog</span> &#123;</span><br><span class="line">  <span class="keyword">var</span> name: MutableState&lt;String&gt; =</span><br><span class="line">    mutableStateOf(<span class="string">&quot;&quot;</span>, policy = <span class="keyword">object</span> : SnapshotMutationPolicy&lt;String&gt; &#123;</span><br><span class="line">      <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">equivalent</span><span class="params">(a: <span class="type">String</span>, b: <span class="type">String</span>)</span></span>: <span class="built_in">Boolean</span> = a == b</span><br><span class="line"></span><br><span class="line">      <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">merge</span><span class="params">(previous: <span class="type">String</span>, current: <span class="type">String</span>, applied: <span class="type">String</span>)</span></span>: String =</span><br><span class="line">        <span class="string">&quot;<span class="variable">$applied</span>, briefly known as <span class="variable">$current</span>, originally known as <span class="variable">$previous</span>&quot;</span></span><br><span class="line">    &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>也就是说, snapshot的设计已经支持了多线程的创建、运行、合并.</p>
+<h5 id="SlotTable怎么处理"><a href="#SlotTable怎么处理" class="headerlink" title="SlotTable怎么处理"></a>SlotTable怎么处理</h5><p>Slottable 只允许存在2种状态</p>
+<ul>
+<li>同时多个reader </li>
+<li>有且只有一个writer</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">openReader</span><span class="params">()</span></span>: SlotReader &#123;</span><br><span class="line">    <span class="keyword">if</span> (writer) error(<span class="string">&quot;Cannot read while a writer is pending&quot;</span>)</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">openWriter</span><span class="params">()</span></span>: SlotWriter &#123;</span><br><span class="line">    runtimeCheck(!writer) &#123; <span class="string">&quot;Cannot start a writer when another writer is pending&quot;</span> &#125;</span><br><span class="line">    runtimeCheck(readers &lt;= <span class="number">0</span>) &#123; <span class="string">&quot;Cannot start a writer when a reader is pending&quot;</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>异步的时候,只要保证不要同时触发这两天规则即可</p>
+<ul>
+<li>change会记录在composition的list上</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">recompositionRunner</span><span class="params">(block )</span></span>&#123;</span><br><span class="line">    Snapshot.registerApplyObserver &#123; changed, _ -&gt;</span><br><span class="line">        <span class="keyword">if</span> (_state.value &gt;= State.Idle) &#123;</span><br><span class="line">            snapshotInvalidations += changed</span><br><span class="line">            deriveStateLocked(). <span class="comment">//释放协程锁, 触发applychange</span></span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="literal">null</span></span><br><span class="line">    &#125;?.resume(<span class="built_in">Unit</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">deriveStateLocked</span><span class="params">()</span></span>: CancellableContinuation&lt;<span class="built_in">Unit</span>&gt;? &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">if</span> (newState == State.PendingWork) &#123;...&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>所以, 整体上把拆出来的composeInit部分异步化,架构上是ok的</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">preComposeForViewAsync</span><span class="params">(key: <span class="type">String</span>,appContext: <span class="type">Context</span>,composeContext: <span class="type">CoroutineContext</span></span></span></span><br><span class="line"><span class="params"><span class="function">)</span></span> &#123;</span><br><span class="line">    <span class="keyword">val</span> v = MyComposeView2(appContext)</span><br><span class="line">    v.initPreComposeOnUiThread()</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//开一个协程,运行在外部传过来的Dispatchers上 ,比如Dispatchers.IO</span></span><br><span class="line">    <span class="keyword">val</span> composeCoroutineScope = CoroutineScope(composeContext)</span><br><span class="line">    composeCoroutineScope.launch(composeContext) &#123;</span><br><span class="line">        v.callComposeContent() <span class="comment">//composeInit</span></span><br><span class="line">    &#125;</span><br><span class="line">    composeCoroutineScope.coroutineContext.job.cancelAndJoin()</span><br><span class="line">    Log.e(<span class="string">&quot;PreComposer&quot;</span>, <span class="string">&quot;preComposeForView: for view:<span class="variable">$v</span>&quot;</span>)</span><br><span class="line">    map[key] = v</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="4-Recompose-重组"><a href="#4-Recompose-重组" class="headerlink" title="4. Recompose 重组"></a>4. Recompose 重组</h2><p>如果发生了state的变更, 会发生什么</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Composable</span>.                                       </span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">TestContent</span><span class="params">()</span></span> &#123;</span><br><span class="line">    Button(onClick = &#123;  </span><br><span class="line">        count++  <span class="comment">//响应event ,通知GlobalSnapshotWriteObserver</span></span><br><span class="line">    &#125;) </span><br><span class="line">    count++     <span class="comment">// 通知MutableSnapshotWriteObserver</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-1-常规流程"><a href="#4-1-常规流程" class="headerlink" title="4.1 常规流程"></a>4.1 常规流程</h3><figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">AndroidComposeView</span>(context: Context) :ViewGroup(context)&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">handleMotionEvent</span><span class="params">(motionEvent: <span class="type">MotionEvent</span>)</span></span>: ProcessResult &#123;</span><br><span class="line">        pointerInputEventProcessor.process(pointerInputEvent,<span class="keyword">this</span>,<span class="literal">true</span>)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>event中 state更改触发后，会通知SnapshotWriteObserver , Onclick 触发的是GlobalSnapshotWriteObserver</p>
+<p><img src="/image/compose/SnapshotObserver.png"></p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">recompositionRunner</span><span class="params">(block )</span></span>&#123;</span><br><span class="line">    Snapshot.registerApplyObserver &#123; changed, _ -&gt;</span><br><span class="line">        snapshotInvalidations += changed</span><br><span class="line">        <span class="comment">//release lock</span></span><br><span class="line">        deriveStateLocked()  <span class="comment">//applychange之后, 释放</span></span><br><span class="line">    &#125;?.resume(<span class="built_in">Unit</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">deriveStateLocked</span><span class="params">()</span></span>: CancellableContinuation&lt;<span class="built_in">Unit</span>&gt;? &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">if</span> (newState == State.PendingWork) &#123;...&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"> <span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">runRecomposeAndApplyChanges</span><span class="params">()</span></span> = recompositionRunner &#123; parentFrameClock -&gt;</span><br><span class="line">    <span class="keyword">while</span> (shouldKeepRecomposing) &#123;</span><br><span class="line">        <span class="comment">//wait lock  : recompose || applychage job  </span></span><br><span class="line">        awaitWorkAvailable()</span><br><span class="line">        recordComposerModificationsLocked()</span><br><span class="line">        </span><br><span class="line">        parentFrameClock.withFrameNanos &#123; frameTime -&gt;</span><br><span class="line">            <span class="comment">//collect recompose job</span></span><br><span class="line">            compositionInvalidations.fastForEach &#123; toRecompose += it &#125;</span><br><span class="line">            </span><br><span class="line">           <span class="keyword">while</span> (toRecompose.isNotEmpty() || toInsert.isNotEmpty()) &#123;</span><br><span class="line">               <span class="comment">//excute recompose job</span></span><br><span class="line">               performRecompose(composition, modifiedValues)?.let &#123;</span><br><span class="line">                   <span class="comment">//collect apply job</span></span><br><span class="line">                    toApply += it</span><br><span class="line">               &#125;</span><br><span class="line">           &#125;</span><br><span class="line">           </span><br><span class="line">           <span class="comment">//excute apply job</span></span><br><span class="line">           toApply.fastForEach &#123; composition -&gt;</span><br><span class="line">               composition.applyChanges()</span><br><span class="line">           &#125;</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;     </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li>event的改动触发了state的修改</li>
+<li>state的修改触发了snapshot上注册的writeobserver回掉, 由于是在onclick中触发的state改动, 所以对应的是globalsnapshot的writeobserver</li>
+<li>writeobserver记录了更改的change, 并且尝试释放协程锁</li>
+<li>runRecomposeAndApplyChanges函数获得锁, 执行下一步</li>
+<li>找出change state对应的composition, 标记Invalidate</li>
+<li>进入frameloop中, 遍历InvalidateComposition, 执行recompose和applychange</li>
+</ol>
+<h3 id="4-2-PreCompose流程"><a href="#4-2-PreCompose流程" class="headerlink" title="4.2 PreCompose流程"></a>4.2 PreCompose流程</h3><p>因为PreCompose将<code>composeinit</code>流程分割成2部分分别执行, 如果2部分中间发生了statechagne, 如何处理?<br>执行顺序可能变成 </p>
+<ol>
+<li>1-2-3-4-5 (state正常时许)</li>
+<li>1-3-2-4-5 (state出现在composeinit 和apply之间)</li>
+</ol>
+<p><img src="/image/compose/precompose_recompose_ppl.png"></p>
+<p>第二种不会导致异常,两种情况在第2步渲染的结果(初始化首屏)和第5步(recompose)的ui结果一致.<br>有2个机制保障</p>
+<ul>
+<li>锁释放时机</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">deriveStateLocked</span><span class="params">()</span></span>: CancellableContinuation&lt;<span class="built_in">Unit</span>&gt;? &#123;</span><br><span class="line">    <span class="comment">//balabala </span></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">if</span> (newState == State.PendingWork) &#123;</span><br><span class="line">        workContinuation</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="literal">null</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>state改动记录机制<ul>
+<li>State 的更改直接合并到globalSnapshot</li>
+<li>recordComposerModificationsLocked函数会将改动的state记录到对应的comositon上</li>
+</ul>
+</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">recordComposerModificationsLocked</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (snapshotInvalidations.isNotEmpty()) &#123;</span><br><span class="line">        snapshotInvalidations.fastForEach &#123; changes -&gt;</span><br><span class="line">            knownCompositions.fastForEach &#123; composition -&gt;</span><br><span class="line">                composition.recordModificationsOf(changes)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>所以, 如果在compose和applychange中间发生状态改变, 只会发生一个state change的记录操作,不回有重复触发compose或者其他操作, 基本没影响</li>
+</ul>
+<p><img src="/image/compose/precompose_consume_change.png"></p>
+<p>在调用applychange后, 检查到state发生了change,会触发recompose. 每个状态有去重操作,只recompose最后一次的改变</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">recompose</span><span class="params">()</span></span>: <span class="built_in">Boolean</span> = synchronized(lock) &#123;</span><br><span class="line">    drainPendingModificationsForCompositionLocked()</span><br><span class="line">    guardChanges &#123;</span><br><span class="line">        guardInvalidationsLocked &#123; invalidations -&gt;</span><br><span class="line">            composer.recompose(invalidations).also &#123; shouldDrain -&gt;</span><br><span class="line">                <span class="comment">// Apply would normally do this for us; do it now if apply shouldn&#x27;t happen.</span></span><br><span class="line">                <span class="keyword">if</span> (!shouldDrain) drainPendingModificationsLocked()</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//drainPendingModificationsForCompositionLocked</span></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">addPendingInvalidationsLocked</span><span class="params">(values: <span class="type">Set</span>&lt;<span class="type">Any</span>&gt;)</span></span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">invalidate</span><span class="params">(value: <span class="type">Any</span>)</span></span> &#123;</span><br><span class="line">       !observationsProcessed.remove(value, scope)            </span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> (value <span class="keyword">in</span> values) &#123;</span><br><span class="line">        invalidate(value)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;       </span><br></pre></td></tr></table></figure>
+
+<h3 id="4-3-我们能做什么-：-并行ReCompose-amp-amp-scope提示"><a href="#4-3-我们能做什么-：-并行ReCompose-amp-amp-scope提示" class="headerlink" title="4.3 我们能做什么 ： 并行ReCompose &amp;&amp; scope提示"></a>4.3 我们能做什么 ： 并行ReCompose &amp;&amp; scope提示</h3><ul>
+<li>并行recompose</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//sync</span></span><br><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">runRecomposeAndApplyChanges</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="comment">//run compose &amp;&amp; applychange sync (ui thread)</span></span><br><span class="line">    <span class="keyword">val</span> changedComposition = performRecompose(composition, <span class="literal">null</span>)</span><br><span class="line">    changedComposition.applyChange()</span><br><span class="line">       </span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//Concurrently</span></span><br><span class="line"><span class="meta">@ExperimentalComposeApi</span></span><br><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">runRecomposeConcurrentlyAndApplyChanges</span><span class="params">()</span></span> &#123;</span><br><span class="line">    recomposeCoroutineScope.launch() &#123;</span><br><span class="line">        <span class="comment">//run composeConcurrently</span></span><br><span class="line">        <span class="keyword">val</span> changedComposition = performRecompose(composition, <span class="literal">null</span>)</span><br><span class="line">        changedComposition?.let &#123; compositionsAwaitingApply += it &#125;</span><br><span class="line">        frameSignal.requestFrameLocked()</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">runFrameLoop</span><span class="params">()</span></span>&#123;</span><br><span class="line">   frameSignal.awaitFrameRequest(stateLock)</span><br><span class="line">   <span class="keyword">while</span>(<span class="literal">true</span>)&#123;</span><br><span class="line">       parentFrameClock.withFrameNanos &#123; frameTime -&gt;</span><br><span class="line">           changedComposition.applyChange()</span><br><span class="line">       &#125;</span><br><span class="line">   &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>12行开启一个协程, 运行compose函数 (任意线程)</li>
+<li>18行发送requestFrameLocked, 唤醒协程runFrameLoop,执行applychagne (ui线程)</li>
+</ul>
+<p><img src="/image/compose/recompose_paralel.png"></p>
+<ul>
+<li>Recompose scope tools</li>
+</ul>
+<h2 id="5-渲染阶段measure-layout-draw"><a href="#5-渲染阶段measure-layout-draw" class="headerlink" title="5. 渲染阶段measure layout  draw"></a>5. 渲染阶段measure layout  draw</h2><figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">AndroidComposeView</span>(context: Context) :ViewGroup(context)&#123;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">onMeasure</span><span class="params">(widthMeasureSpec: <span class="type">Int</span>, heightMeasureSpec: <span class="type">Int</span>)</span></span> &#123;</span><br><span class="line">        measureAndLayoutDelegate.updateRootConstraints(constraints)</span><br><span class="line">        measureAndLayoutDelegate.measureOnly()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">onLayout</span><span class="params">(changed: <span class="type">Boolean</span>, l: <span class="type">Int</span>, t: <span class="type">Int</span>, r: <span class="type">Int</span>, b: <span class="type">Int</span>)</span></span> &#123;</span><br><span class="line">        measureAndLayoutDelegate.measureAndLayout(resendMotionEventOnLayout)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">dispatchDraw</span><span class="params">(canvas: <span class="type">android</span>.<span class="type">graphics</span>.<span class="type">Canvas</span>)</span></span> &#123;</span><br><span class="line">        measureAndLayout()</span><br><span class="line">        <span class="keyword">if</span> (dirtyLayers.isNotEmpty()) &#123;</span><br><span class="line">            <span class="keyword">for</span> (i <span class="keyword">in</span> <span class="number">0</span> until dirtyLayers.size) &#123;</span><br><span class="line">            <span class="keyword">val</span> layer = dirtyLayers[i]    <span class="comment">//RenderNodeLayer</span></span><br><span class="line">            layer.updateDisplayList()     <span class="comment">//DisplayList</span></span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">val</span> saveCount = canvas.save()</span><br><span class="line">        canvas.clipRect(<span class="number">0f</span>, <span class="number">0f</span>, <span class="number">0f</span>, <span class="number">0f</span>)</span><br><span class="line">        <span class="keyword">super</span>.dispatchDraw(canvas)</span><br><span class="line">        canvas.restoreToCount(saveCount)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-1-我们能做什么-（渲染优化、自渲染）"><a href="#5-1-我们能做什么-（渲染优化、自渲染）" class="headerlink" title="5.1 我们能做什么 （渲染优化、自渲染）"></a>5.1 我们能做什么 （渲染优化、自渲染）</h3><ul>
+<li>渲染层优化<ul>
+<li>RenderNodeLayer</li>
+<li>Layout</li>
+<li>Displaylist</li>
+<li>多线程measure、layout</li>
+</ul>
+</li>
+<li>跨端渲染探索</li>
+</ul>
+<p><img src="/image/compose/compose_cross_platform.png"></p>
+<h1 id="未来可以做的"><a href="#未来可以做的" class="headerlink" title="未来可以做的"></a>未来可以做的</h1><ul>
+<li>runtime<ul>
+<li>并行化</li>
+<li>Appchange </li>
+</ul>
+</li>
+<li>render层<ul>
+<li>layout + measure 提前</li>
+<li>Render layer 分层</li>
+<li>跨平台渲染切入</li>
+</ul>
+</li>
+<li>编译器<ul>
+<li>包体积</li>
+<li>代码插入（覆盖率？特殊逻辑）</li>
+<li>不同平台编译</li>
+</ul>
+</li>
+<li>工具链&amp;&amp;编译器<ul>
+<li>编译器静态分析提示</li>
+<li>devtools </li>
+</ul>
+</li>
+<li>上层<ul>
+<li>相关组件、监控</li>
+</ul>
+</li>
+</ul>
+<h1 id="附录"><a href="#附录" class="headerlink" title="附录"></a>附录</h1><ul>
+<li><a target="_blank" rel="noopener" href="https://juejin.cn/post/7095544677515919367#heading-15">一文看懂 Jetpack Compose 快照系统 - 掘金</a></li>
+<li><a target="_blank" rel="noopener" href="https://mdnice.com/writing/3dd7b593f86242b0a8cf254f9fff37ba">Compose 为什么可以跨平台？</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/12/30/compose/compiler_2/" rel="prev" title="Compose Compiler(1) Compose plugin">
+      <i class="fa fa-chevron-left"></i> Compose Compiler(1) Compose plugin
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#PreCompose%E6%96%B9%E6%A1%88%E7%AE%80%E4%BB%8B"><span class="nav-number">2.</span> <span class="nav-text">PreCompose方案简介</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90"><span class="nav-number">2.1.</span> <span class="nav-text">问题分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B5%81%E7%A8%8B%E6%94%B9%E9%80%A0"><span class="nav-number">2.2.</span> <span class="nav-text">流程改造</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E6%A8%A1%E5%9D%97%E5%88%92%E5%88%86%E4%BB%A5%E5%8F%8A%E6%94%B9%E9%80%A0%E6%96%B9%E6%A1%88%E8%AF%A6%E8%A7%A3"><span class="nav-number">3.</span> <span class="nav-text">源码模块划分以及改造方案详解</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-%E5%88%86%E5%B1%82-%E6%A8%A1%E5%9D%97%E8%AE%BE%E8%AE%A1"><span class="nav-number">3.1.</span> <span class="nav-text">1. 分层&#x2F;模块设计</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Compose-Compiler-Plugin"><span class="nav-number">3.2.</span> <span class="nav-text">2. Compose Compiler Plugin</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-Kotlin-k2%E7%BC%96%E8%AF%91%E5%99%A8"><span class="nav-number">3.2.1.</span> <span class="nav-text">2.1 Kotlin k2编译器</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Frontend%EF%BC%88%E7%BC%96%E8%AF%91%E5%99%A8%E5%89%8D%E7%AB%AF%EF%BC%89-ide%E6%8F%92%E4%BB%B6%E5%A4%8D%E7%94%A8"><span class="nav-number">3.2.1.1.</span> <span class="nav-text">Frontend（编译器前端）  ide插件复用</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Backend%EF%BC%88%E7%BC%96%E8%AF%91%E5%99%A8%E5%90%8E%E7%AB%AF%EF%BC%89"><span class="nav-number">3.2.1.2.</span> <span class="nav-text">Backend（编译器后端）</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-Compose%E7%9A%84%E7%BC%96%E8%AF%91%E6%8F%92%E4%BB%B6"><span class="nav-number">3.2.2.</span> <span class="nav-text">2.2 Compose的编译插件</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#2-2-1-%E5%89%8D%E7%AB%AF%E7%BC%96%E8%AF%91"><span class="nav-number">3.2.2.1.</span> <span class="nav-text">2.2.1 前端编译</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-2-2-%E5%90%8E%E7%AB%AF%E7%BC%96%E8%AF%91"><span class="nav-number">3.2.2.2.</span> <span class="nav-text">2.2.2 后端编译</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E6%88%91%E4%BB%AC%E5%8F%AF%E4%BB%A5%E5%81%9A%E4%BB%80%E4%B9%88%EF%BC%88%E7%BC%96%E8%AF%91%E4%BC%98%E5%8C%96%EF%BC%89"><span class="nav-number">3.2.3.</span> <span class="nav-text">2.3 我们可以做什么（编译优化）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-Compose%E8%BF%90%E8%A1%8C%E9%98%B6%E6%AE%B5"><span class="nav-number">3.3.</span> <span class="nav-text">3. Compose运行阶段</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-Step1-Compose-Env-Prepare"><span class="nav-number">3.3.1.</span> <span class="nav-text">3.1 Step1: Compose Env Prepare</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Step2-ComposeRuntime"><span class="nav-number">3.3.2.</span> <span class="nav-text">3.2 Step2: ComposeRuntime</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-Snapshot-system"><span class="nav-number">3.3.2.1.</span> <span class="nav-text">3.2.1 Snapshot system</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-2-Compose-env"><span class="nav-number">3.3.2.2.</span> <span class="nav-text">3.2.2 Compose env</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-Step3-ApplyChange"><span class="nav-number">3.3.3.</span> <span class="nav-text">3.3 Step3: ApplyChange</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-%E6%88%91%E4%BB%AC%E8%83%BD%E5%81%9A%E4%BB%80%E4%B9%88%EF%BC%9FPreCompose%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E6%96%B9%E6%A1%88%E8%AF%A6%E8%A7%A3"><span class="nav-number">3.3.4.</span> <span class="nav-text">3.4 我们能做什么？PreCompose性能优化方案详解</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-4-1-UI%E7%BA%BF%E7%A8%8BPrecompose"><span class="nav-number">3.3.4.1.</span> <span class="nav-text">3.4.1 UI线程Precompose</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-4-2-List-Item-Precompose"><span class="nav-number">3.3.4.2.</span> <span class="nav-text">3.4.2 List Item Precompose</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-4-3-Compose%E5%BC%82%E6%AD%A5%E5%8C%96%E6%96%B9%E6%A1%88"><span class="nav-number">3.3.4.3.</span> <span class="nav-text">3.4.3 Compose异步化方案</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#compose%E5%87%BD%E6%95%B0%E6%98%AF%E5%90%A6%E6%94%AF%E6%8C%81%E5%B9%B6%E8%A1%8C-%E5%BC%82%E6%AD%A5-%E5%87%BD%E6%95%B0%E5%BC%8F"><span class="nav-number">3.3.4.3.1.</span> <span class="nav-text">compose函数是否支持并行&#x2F;异步? (函数式)</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#State-Snapshot%E6%98%AF%E5%90%A6%E6%94%AF%E6%8C%81%E5%A4%9A%E7%BA%BF%E7%A8%8B"><span class="nav-number">3.3.4.3.2.</span> <span class="nav-text">State&#x2F;Snapshot是否支持多线程?</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#SlotTable%E6%80%8E%E4%B9%88%E5%A4%84%E7%90%86"><span class="nav-number">3.3.4.3.3.</span> <span class="nav-text">SlotTable怎么处理</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-Recompose-%E9%87%8D%E7%BB%84"><span class="nav-number">3.4.</span> <span class="nav-text">4. Recompose 重组</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-%E5%B8%B8%E8%A7%84%E6%B5%81%E7%A8%8B"><span class="nav-number">3.4.1.</span> <span class="nav-text">4.1 常规流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-PreCompose%E6%B5%81%E7%A8%8B"><span class="nav-number">3.4.2.</span> <span class="nav-text">4.2 PreCompose流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-%E6%88%91%E4%BB%AC%E8%83%BD%E5%81%9A%E4%BB%80%E4%B9%88-%EF%BC%9A-%E5%B9%B6%E8%A1%8CReCompose-amp-amp-scope%E6%8F%90%E7%A4%BA"><span class="nav-number">3.4.3.</span> <span class="nav-text">4.3 我们能做什么 ： 并行ReCompose &amp;&amp; scope提示</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-%E6%B8%B2%E6%9F%93%E9%98%B6%E6%AE%B5measure-layout-draw"><span class="nav-number">3.5.</span> <span class="nav-text">5. 渲染阶段measure layout  draw</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-%E6%88%91%E4%BB%AC%E8%83%BD%E5%81%9A%E4%BB%80%E4%B9%88-%EF%BC%88%E6%B8%B2%E6%9F%93%E4%BC%98%E5%8C%96%E3%80%81%E8%87%AA%E6%B8%B2%E6%9F%93%EF%BC%89"><span class="nav-number">3.5.1.</span> <span class="nav-text">5.1 我们能做什么 （渲染优化、自渲染）</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9C%AA%E6%9D%A5%E5%8F%AF%E4%BB%A5%E5%81%9A%E7%9A%84"><span class="nav-number">4.</span> <span class="nav-text">未来可以做的</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%99%84%E5%BD%95"><span class="nav-number">5.</span> <span class="nav-text">附录</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="lucky_chen"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">lucky_chen</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">30</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/lucky-chen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;lucky-chen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="/qh438406812@gmail.com" title="E-Mail → qh438406812@gmail.com"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">lucky_chen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"lucky-chen.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="概览   版本 底层协议 特性 备注    1.x tcp 更多的缓存控制策略请求范围设置(断点续传)新增了错误状态响应码Host头处理，传递主机名支持长连接 :—   https tcp+tls 需要证书TLS加密传输协议 :—   2.0 tcp+tls 二进制格式多路复用header压缩服务端推送 :—   3.0 udp 减少了TCP三次握手及TLS握手时间连接迁移线头阻塞(HOL)问题的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Http版本协议变迁历史">
+<meta property="og:url" content="https://lucky-chen.github.io/2016/08/06/network/http2/index.html">
+<meta property="og:site_name" content="Chen&#39;s Notes">
+<meta property="og:description" content="概览   版本 底层协议 特性 备注    1.x tcp 更多的缓存控制策略请求范围设置(断点续传)新增了错误状态响应码Host头处理，传递主机名支持长连接 :—   https tcp+tls 需要证书TLS加密传输协议 :—   2.0 tcp+tls 二进制格式多路复用header压缩服务端推送 :—   3.0 udp 减少了TCP三次握手及TLS握手时间连接迁移线头阻塞(HOL)问题的">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://lucky-chen.github.io/image/network/http_request.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/network/http_response.png">
+<meta property="og:image" content="http://static.zybuluo.com/qh438406812/92dwizpb3rzlf66gz90hm58b/http2.png">
+<meta property="og:image" content="http://static.zybuluo.com/qh438406812/sj9s2vcx169ttt4z604mt7sj/201504182058.png">
+<meta property="og:image" content="http://static.zybuluo.com/qh438406812/stm3cxid5pe8ayrgasicbw59/http2-server-push.png">
+<meta property="og:image" content="http://static.zybuluo.com/qh438406812/tjkln37060z1ng8cgs1xatxc/hpack.png">
+<meta property="article:published_time" content="2016-08-05T16:00:00.000Z">
+<meta property="article:modified_time" content="2023-04-12T14:47:25.404Z">
+<meta property="article:author" content="lucky_chen">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://lucky-chen.github.io/image/network/http_request.png">
+
+<link rel="canonical" href="https://lucky-chen.github.io/2016/08/06/network/http2/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Http版本协议变迁历史 | Chen's Notes</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Chen's Notes</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://lucky-chen.github.io/2016/08/06/network/http2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="lucky_chen">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Chen's Notes">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Http版本协议变迁历史
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2016-08-06 00:00:00" itemprop="dateCreated datePublished" datetime="2016-08-06T00:00:00+08:00">2016-08-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-04-12 22:47:25" itemprop="dateModified" datetime="2023-04-12T22:47:25+08:00">2023-04-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/NetWork/" itemprop="url" rel="index"><span itemprop="name">NetWork</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="概览"><a href="#概览" class="headerlink" title="概览"></a>概览</h1><table>
+<thead>
+<tr>
+<th align="left">版本</th>
+<th align="left">底层协议</th>
+<th align="left">特性</th>
+<th align="left">备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1.x</td>
+<td align="left">tcp</td>
+<td align="left">更多的缓存控制策略<br>请求范围设置(断点续传)<br>新增了错误状态响应码<br>Host头处理，传递主机名<br>支持长连接</td>
+<td align="left">:—</td>
+</tr>
+<tr>
+<td align="left">https</td>
+<td align="left">tcp+tls</td>
+<td align="left">需要证书<br>TLS加密传输协议<br></td>
+<td align="left">:—</td>
+</tr>
+<tr>
+<td align="left">2.0</td>
+<td align="left">tcp+tls</td>
+<td align="left">二进制格式<br>多路复用<br>header压缩<br>服务端推送</td>
+<td align="left">:—</td>
+</tr>
+<tr>
+<td align="left">3.0</td>
+<td align="left">udp</td>
+<td align="left">减少了TCP三次握手及TLS握手时间<br>连接迁移<br>线头阻塞(HOL)问题的解决更为彻底</td>
+<td align="left">:—</td>
+</tr>
+</tbody></table>
+<span id="more"></span>
+
+<h1 id="Http-1-x"><a href="#Http-1-x" class="headerlink" title="Http 1.x"></a>Http 1.x</h1><h2 id="报文格式"><a href="#报文格式" class="headerlink" title="报文格式"></a>报文格式</h2><p>请求报文</p>
+<p><img src="/image/network/http_request.png"></p>
+<p>响应报文</p>
+<p><img src="/image/network/http_response.png"></p>
+<h2 id="链接过程"><a href="#链接过程" class="headerlink" title="链接过程"></a>链接过程</h2><ul>
+<li>建立一个TCP套接字连接(<strong>3次握手</strong>)</li>
+<li>客户端向服务器发送一个文本的请求报文</li>
+<li>服务器响应报文: 解析请求，定位请求资源。服务器将资源复本写到TCP套接字，由客户端读取</li>
+<li>释放连接TCP连接:<ul>
+<li>若connection 模式为close，则服务器主动关闭TCP连接，客户端被动关闭连接，释放TCP连接; (<strong>4次挥手</strong>)</li>
+<li>若connection 模式为keepalive，则该连接会保持一段时间，在该时间内可以继续接收请求;</li>
+</ul>
+</li>
+</ul>
+<h1 id="Http-2-0"><a href="#Http-2-0" class="headerlink" title="Http 2.0"></a>Http 2.0</h1><ul>
+<li>特性<ul>
+<li>二进制报文</li>
+<li>链接多路复用</li>
+<li>头部压缩</li>
+<li>Server Push</li>
+</ul>
+</li>
+<li>相关文档<ul>
+<li><a target="_blank" rel="noopener" href="http://httpwg.org/specs/rfc7540.html">协议文档</a></li>
+<li><a target="_blank" rel="noopener" href="https://l-zhi.com:8081/item1.html">速度对比</a></li>
+<li><a target="_blank" rel="noopener" href="http://www.softwareishard.com/har/viewer/">har</a></li>
+</ul>
+</li>
+</ul>
+<h2 id="概念"><a href="#概念" class="headerlink" title="概念"></a>概念</h2><ul>
+<li>流(Stream): 交互处理单元，表达一次完整的资源请求-响应数据交换流程</li>
+<li>帧(Frame)：交换数据的基本单位，一个流有一到多个帧</li>
+</ul>
+<h2 id="报文"><a href="#报文" class="headerlink" title="报文"></a>报文</h2><p><img src="http://static.zybuluo.com/qh438406812/92dwizpb3rzlf66gz90hm58b/http2.png" alt="http2.png-190.3kB"></p>
+<p>HTTP/2 采用二进制格式传输数据，数据的单位是Frame,Frame的格式如下:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">+-----------------------------------------------+</span><br><span class="line">|                 Length (24)                   |</span><br><span class="line">+---------------+---------------+---------------+</span><br><span class="line">|   Type (8)    |   Flags (8)   |</span><br><span class="line">+-+-------------+---------------+-------------------------------+</span><br><span class="line">|R|                 Stream Identifier (31)                      |</span><br><span class="line">+=+=============================================================+</span><br><span class="line">|                   Frame Payload (0...)                      ...</span><br><span class="line">+---------------------------------------------------------------+</span><br></pre></td></tr></table></figure>
+<p>报文解释</p>
+<ul>
+<li>Length 24: Frame Payload的大小,2M</li>
+<li>Type: Frame类型  <code>DATA/HEADERS/PRIORITY/PUSH_PROMISE</code></li>
+<li>Flags 8 <code>END_STREAM/END_HEADERS/PADDED/PRIORITY</code></li>
+<li>R 1 保留位</li>
+<li>Stream Identifier 31 数据流id</li>
+<li>Frame Payload 0… 数据内容</li>
+</ul>
+<h2 id="多路复用"><a href="#多路复用" class="headerlink" title="多路复用"></a>多路复用</h2><p>解决1.x 线头阻塞(Head-of-Line Blocking)问题，提高网路请求速度</p>
+<p><img src="http://static.zybuluo.com/qh438406812/sj9s2vcx169ttt4z604mt7sj/201504182058.png" alt="201504182058.png-168.7kB"></p>
+<h2 id="Server-Push"><a href="#Server-Push" class="headerlink" title="Server Push"></a>Server Push</h2><p><img src="http://static.zybuluo.com/qh438406812/stm3cxid5pe8ayrgasicbw59/http2-server-push.png" alt="http2-server-push.png-157.6kB"></p>
+<ul>
+<li>HTTP 2.0 连接后，客户端与服务器交换SETTINGS 帧，借此可以限定双向并发的流的最大数量。因此，客户端可以限定推送流的数量，或者通过把这个值设置为0 而完全禁用服务器推送。</li>
+<li>所有推送的资源都遵守同源策略。换句话说，服务器不能随便将第三方资源推送给客户端，而必须是经过双方确认才行。</li>
+<li>PUSH_PROMISE：所有服务器推送流都由PUSH_PROMISE 发端，服务器向客户端发出的有意推送所述资源的信号。客户端接收到PUSH_PROMISE 帧之后，可以视自身需求选择拒绝这个流</li>
+<li>几点限制：<ul>
+<li>服务器必须遵循请求- 响应的循环，只能借着对请求的响应推送资源</li>
+<li>PUSH_PROMISE 帧必须在返回响应之前发送，以免客户端出现竞态条件。</li>
+</ul>
+</li>
+</ul>
+<h2 id="流："><a href="#流：" class="headerlink" title="流："></a>流：</h2><ul>
+<li>frame</li>
+<li>属性<ul>
+<li>优先级</li>
+<li>状态（生命周期）</li>
+<li>标识符</li>
+</ul>
+</li>
+<li>管理行为<ul>
+<li>流量控制</li>
+<li>并发流数量</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>Stream States</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line">     </span><br><span class="line">                         +--------+</span><br><span class="line">                 send PP |        | recv PP</span><br><span class="line">                ,--------|  idle  |--------.</span><br><span class="line">               /         |        |         \</span><br><span class="line">              v          +--------+          v</span><br><span class="line">       +----------+          |           +----------+</span><br><span class="line">       |          |          | send H /  |          |</span><br><span class="line">,------| reserved |          | recv H    | reserved |------.</span><br><span class="line">|      | (local)  |          |           | (remote) |      |</span><br><span class="line">|      +----------+          v           +----------+      |</span><br><span class="line">|          |             +--------+             |          |</span><br><span class="line">|          |     recv ES |        | send ES     |          |</span><br><span class="line">|   send H |     ,-------|  open  |-------.     | recv H   |</span><br><span class="line">|          |    /        |        |        \    |          |</span><br><span class="line">|          v   v         +--------+         v   v          |</span><br><span class="line">|      +----------+          |           +----------+      |</span><br><span class="line">|      |   half   |          |           |   half   |      |</span><br><span class="line">|      |  closed  |          | send R /  |  closed  |      |</span><br><span class="line">|      | (remote) |          | recv R    | (local)  |      |</span><br><span class="line">|      +----------+          |           +----------+      |</span><br><span class="line">|           |                |                 |           |</span><br><span class="line">|           | send ES /      |       recv ES / |           |</span><br><span class="line">|           | send R /       v        send R / |           |</span><br><span class="line">|           | recv R     +--------+   recv R   |           |</span><br><span class="line">| send R /  `-----------&gt;|        |&lt;-----------&#x27;  send R / |</span><br><span class="line">| recv R                 | closed |               recv R   |</span><br><span class="line">`-----------------------&gt;|        |&lt;----------------------&#x27;</span><br><span class="line">                         +--------+</span><br><span class="line"></span><br><span class="line">   send:   endpoint sends this frame</span><br><span class="line">   recv:   endpoint receives this frame</span><br><span class="line"></span><br><span class="line">   H:  HEADERS frame (with implied CONTINUATIONs)</span><br><span class="line">   PP: PUSH_PROMISE frame (with implied CONTINUATIONs)</span><br><span class="line">   ES: END_STREAM flag</span><br><span class="line">   R:  RST_STREAM frame</span><br></pre></td></tr></table></figure>
+<h2 id="头部压缩"><a href="#头部压缩" class="headerlink" title="头部压缩"></a>头部压缩</h2><p>减少需要传输的header大小</p>
+<ul>
+<li>建立索引表，表示常用的请求</li>
+<li>字符串进行压缩</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th align="left">Index</th>
+<th align="left">Index</th>
+<th align="left">Index</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left">authority</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left">method</td>
+<td align="left">GET</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left">method</td>
+<td align="left">POST</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left">path</td>
+<td align="left">/</td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td align="left">path</td>
+<td align="left">/index.html</td>
+</tr>
+<tr>
+<td align="left">6</td>
+<td align="left">scheme</td>
+<td align="left">http</td>
+</tr>
+<tr>
+<td align="left">7</td>
+<td align="left">scheme</td>
+<td align="left">https</td>
+</tr>
+<tr>
+<td align="left">8</td>
+<td align="left">status</td>
+<td align="left">200</td>
+</tr>
+<tr>
+<td align="left">…</td>
+<td align="left">…</td>
+<td align="left">…</td>
+</tr>
+<tr>
+<td align="left">58</td>
+<td align="left">user-agent</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">…</td>
+<td align="left">…</td>
+<td align="left">…</td>
+</tr>
+<tr>
+<td align="left">61</td>
+<td align="left">www-authenticate</td>
+<td align="left"></td>
+</tr>
+</tbody></table>
+<p>缓存常用数据,保存在动态表里</p>
+<p><img src="http://static.zybuluo.com/qh438406812/tjkln37060z1ng8cgs1xatxc/hpack.png" alt="hpack.png-148.4kB"></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&lt;----------  Index Address Space ----------&gt;</span><br><span class="line">&lt;-- Static  Table --&gt;  &lt;-- Dynamic Table --&gt;</span><br><span class="line">+---+-----------+---+  +---+-----------+---+</span><br><span class="line">| 1 |    ...    | s |  |s+1|    ...    |s+k|</span><br><span class="line">+---+-----------+---+  +---+-----------+---+</span><br><span class="line">                       ^                   |</span><br><span class="line">                       |                   V</span><br><span class="line">                 Insertion Point      Dropping Point</span><br></pre></td></tr></table></figure>
+
+<h1 id="Http3-0"><a href="#Http3-0" class="headerlink" title="Http3.0"></a>Http3.0</h1><ul>
+<li>对线头阻塞(HOL)问题的解决更为彻底</li>
+<li>切换网络时的连接保持</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th align="left">机制</th>
+<th align="left">2.0问题</th>
+<th align="left">3.0方案</th>
+<th align="left">备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">自定义连接机制</td>
+<td align="left">tcp连接是由四元组标识的，分别是源ip、源端口、目的端口，一旦一个元素发生变化时，就会断开重连，重新连接</td>
+<td align="left">使用udp协议，不再以四元组标识，而是以一个64位的随机数作为ID来标识。</td>
+<td align="left">:—</td>
+</tr>
+<tr>
+<td align="left">自定义重传机制</td>
+<td align="left">tcp超时的采样存在不准确的问题（原始包和重传包ack区分）</td>
+<td align="left">QUIC也有个序列号，是递增的</td>
+<td align="left">:—</td>
+</tr>
+<tr>
+<td align="left">无阻塞的多路复用</td>
+<td align="left">tcp协议在处理包时是有严格顺序的，当其中一个数据包遇到问题，TCP连接需要等待这个包完成重传之后才能继续进行.(前面stream2的帧没有收到，后面stream1的帧也会因此堵塞)</td>
+<td align="left">QUIC是基于UDP的，一个连接上的多个stream之间没有依赖</td>
+<td align="left">:—</td>
+</tr>
+<tr>
+<td align="left">自定义流量控制</td>
+<td align="left">TCP协议中，接收端的窗口的起始点是下一个要接收并且ACK的包，即便后来的包都到了，放在缓存里面，窗口也不能右移，就会导致后面的到了，也有可能超时重传，浪费带宽</td>
+<td align="left">QUIC的ACK是基于offset的，每个offset的包来了，进了缓存，就可以应答，应答后就不会重发</td>
+<td align="left">:—</td>
+</tr>
+</tbody></table>
+<h1 id="附录"><a href="#附录" class="headerlink" title="附录"></a>附录</h1><ul>
+<li><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/90438293">HTTP的前世今生（HTTP1.1，HTTPS，SPDY，HTTP2.0，QUIC，HTTP3.0）</a></li>
+<li><a target="_blank" rel="noopener" href="https://blog.csdn.net/glpghz/article/details/106063833">HTTP1.0、HTTP2.0、HTTP 3.0及HTTPS简要介绍</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.cnblogs.com/an-wen/p/11180076.html">HTTP协议超级详解</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.cnblogs.com/chenjinxinlove/p/10104854.html">HTTP3.0(QUIC的实现机制)</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2016/07/06/hello_chen/" rel="prev" title="开篇大吉">
+      <i class="fa fa-chevron-left"></i> 开篇大吉
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2016/08/25/android/handle/" rel="next" title="Android源码之Handler">
+      Android源码之Handler <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A6%82%E8%A7%88"><span class="nav-number">1.</span> <span class="nav-text">概览</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Http-1-x"><span class="nav-number">2.</span> <span class="nav-text">Http 1.x</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8A%A5%E6%96%87%E6%A0%BC%E5%BC%8F"><span class="nav-number">2.1.</span> <span class="nav-text">报文格式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%93%BE%E6%8E%A5%E8%BF%87%E7%A8%8B"><span class="nav-number">2.2.</span> <span class="nav-text">链接过程</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Http-2-0"><span class="nav-number">3.</span> <span class="nav-text">Http 2.0</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A6%82%E5%BF%B5"><span class="nav-number">3.1.</span> <span class="nav-text">概念</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8A%A5%E6%96%87"><span class="nav-number">3.2.</span> <span class="nav-text">报文</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8"><span class="nav-number">3.3.</span> <span class="nav-text">多路复用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Server-Push"><span class="nav-number">3.4.</span> <span class="nav-text">Server Push</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B5%81%EF%BC%9A"><span class="nav-number">3.5.</span> <span class="nav-text">流：</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A4%B4%E9%83%A8%E5%8E%8B%E7%BC%A9"><span class="nav-number">3.6.</span> <span class="nav-text">头部压缩</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Http3-0"><span class="nav-number">4.</span> <span class="nav-text">Http3.0</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%99%84%E5%BD%95"><span class="nav-number">5.</span> <span class="nav-text">附录</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="lucky_chen"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">lucky_chen</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">30</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/lucky-chen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;lucky-chen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="/qh438406812@gmail.com" title="E-Mail → qh438406812@gmail.com"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">lucky_chen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

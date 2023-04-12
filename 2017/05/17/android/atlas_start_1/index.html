@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"lucky-chen.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="概述对应官网文档地址 Atlas整个启动过程的时序如下图所示，本篇只关注下图中的1-5步。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Android动态化容器框架Atlas之启动过程(上)">
+<meta property="og:url" content="https://lucky-chen.github.io/2017/05/17/android/atlas_start_1/index.html">
+<meta property="og:site_name" content="Chen&#39;s Notes">
+<meta property="og:description" content="概述对应官网文档地址 Atlas整个启动过程的时序如下图所示，本篇只关注下图中的1-5步。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://lucky-chen.github.io/image/android/atlas_core_start_img.svg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/android/atlas_application_demo.png">
+<meta property="og:image" content="https://lucky-chen.github.io/2017/05/17/android/atlas_start_1/atlas_manifest_application.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/android/atlas_framework_property.svg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/android/atlas_meta_data.png">
+<meta property="og:image" content="https://lucky-chen.github.io/2017/05/17/android/atlas_start_1/atlas_core_start_provider_img.svg">
+<meta property="article:published_time" content="2017-05-16T16:00:00.000Z">
+<meta property="article:modified_time" content="2023-04-12T14:47:25.400Z">
+<meta property="article:author" content="lucky_chen">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://lucky-chen.github.io/image/android/atlas_core_start_img.svg">
+
+<link rel="canonical" href="https://lucky-chen.github.io/2017/05/17/android/atlas_start_1/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Android动态化容器框架Atlas之启动过程(上) | Chen's Notes</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Chen's Notes</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://lucky-chen.github.io/2017/05/17/android/atlas_start_1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="lucky_chen">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Chen's Notes">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Android动态化容器框架Atlas之启动过程(上)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-05-17 00:00:00" itemprop="dateCreated datePublished" datetime="2017-05-17T00:00:00+08:00">2017-05-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-04-12 22:47:25" itemprop="dateModified" datetime="2023-04-12T22:47:25+08:00">2023-04-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Android/" itemprop="url" rel="index"><span itemprop="name">Android</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p><a target="_blank" rel="noopener" href="https://alibaba.github.io/atlas/code_read/atlas_start/atlas_start_1.html">对应官网文档地址</a></p>
+<p>Atlas整个启动过程的时序如下图所示，本篇只关注下图中的1-5步。</p>
+<p><img src="/image/android/atlas_core_start_img.svg"></p>
+<span id="more"></span>
+
+<h1 id="入口"><a href="#入口" class="headerlink" title="入口"></a>入口</h1><p>我们都知道，app的入口是application，那么atlas的入口application是什么呢，看一下app模块中manifest中的定义</p>
+<p><img src="/image/android/atlas_application_demo.png"></p>
+<p>看样子，是DemoApplication<br><br>真的是这样的吗？<br><br><strong>当然不是</strong></p>
+<p>我们看一下反编译后的manifest</p>
+<p><img src="atlas_manifest_application.png"></p>
+<p>为什么会是AtlasBridgeApplication呢，manifest中明明写的很清楚 : DemoApplication。<br><br>事实上为了接入的方便，Atlas在编译期就替换了入口application。不过，Atlas保证在运行期时会调用DemoApplication的相关方法。</p>
+<h1 id="1-AtlasBridgeApplication-attachBaseContext"><a href="#1-AtlasBridgeApplication-attachBaseContext" class="headerlink" title="1. AtlasBridgeApplication.attachBaseContext"></a>1. AtlasBridgeApplication.attachBaseContext</h1><p>我们看一下AtlasBridgeApplication中的相关方法</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">attachBaseContext</span><span class="params">(Context base)</span> &#123;</span><br><span class="line">	<span class="built_in">super</span>.attachBaseContext(base);</span><br><span class="line">	<span class="comment">//...一些逻辑</span></span><br><span class="line">	</span><br><span class="line">	<span class="comment">//1. 构造BridgeApplicationDelegate对象</span></span><br><span class="line">	<span class="type">Class</span> <span class="variable">BridgeApplicationDelegateClazz</span> <span class="operator">=</span> getBaseContext().getClassLoader().loadClass(<span class="string">&quot;android.taobao.atlas.bridge.BridgeApplicationDelegate&quot;</span>);</span><br><span class="line">	Constructor&lt;?&gt; con = BridgeApplicationDelegateClazz.getConstructor(parTypes);</span><br><span class="line">	mBridgeApplicationDelegate = con.newInstance(<span class="built_in">this</span>,getProcessName(...);</span><br><span class="line">	</span><br><span class="line">	<span class="comment">//2. 执行BridgeApplicationDelegate的attachBaseContext方法</span></span><br><span class="line">	<span class="type">Method</span> <span class="variable">method</span> <span class="operator">=</span> BridgeApplicationDelegateClazz.getDeclaredMethod(<span class="string">&quot;attachBaseContext&quot;</span>);</span><br><span class="line">	method.invoke(mBridgeApplicationDelegate);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到，代码虽长，但其实就只干了两件事。</p>
+<ul>
+<li>反射并构造BridgeApplicationDelegate的实例</li>
+<li>执行BridgeApplicationDelegate的attachBaseContext方法。</li>
+</ul>
+<p>先看BridgeApplicationDelegate的构造方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//BridgeApplicationDelegate.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="title function_">BridgeApplicationDelegate</span><span class="params">(Application rawApplication...)</span>&#123;</span><br><span class="line">	mRawApplication = rawApplication;</span><br><span class="line">	PackageManagerDelegate.delegatepackageManager(</span><br><span class="line">		rawApplication.getBaseContext()</span><br><span class="line">	);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>没什么内容，直接跟进<code>delegatepackageManager</code>的函数实现</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//PackageManagerDelegate.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">delegatepackageManager</span><span class="params">(Context context)</span>&#123;</span><br><span class="line">      mBaseContext = context;</span><br><span class="line">      <span class="comment">//1. 反射pm</span></span><br><span class="line">      <span class="type">PackageManager</span> <span class="variable">manager</span> <span class="operator">=</span> mBaseContext.getPackageManager();</span><br><span class="line">      <span class="type">Class</span> <span class="variable">ApplicationPackageManager</span> <span class="operator">=</span> Class.forName(<span class="string">&quot;android.app.ApplicationPackageManager&quot;</span>);</span><br><span class="line">      <span class="type">Field</span> <span class="variable">field</span> <span class="operator">=</span> ApplicationPackageManager.getDeclaredField(<span class="string">&quot;mPM&quot;</span>);</span><br><span class="line">      field.setAccessible(<span class="literal">true</span>);</span><br><span class="line">      <span class="type">Object</span> <span class="variable">rawPm</span> <span class="operator">=</span> field.get(manager);</span><br><span class="line">      <span class="comment">//2. 动态代理pm</span></span><br><span class="line">      <span class="type">Class</span> <span class="variable">IPackageManagerClass</span> <span class="operator">=</span> Class.forName(<span class="string">&quot;android.content.pm.IPackageManager&quot;</span>);</span><br><span class="line">      mPackageManagerProxyhandler = <span class="keyword">new</span> <span class="title class_">PackageManagerProxyhandler</span>(rawPm);            </span><br><span class="line">      mProxyPm = Proxy.newProxyInstance(mBaseContext.getClassLoader(), <span class="keyword">new</span> <span class="title class_">Class</span>[]&#123;IPackageManagerClass&#125;, mPackageManagerProxyhandler);</span><br><span class="line">      <span class="comment">//3. 替换pm</span></span><br><span class="line">      field.set(manager, mProxyPm);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到，这段代码的核心思想就是将系统的pm，替换为我们实现的PackageManagerProxyhandler。我们先不关注PackageManagerProxyhandler的实现，接着看<code>BridgeApplicationDelegate</code>中函数attachBaseContext的实现。</p>
+<h1 id="2-BridgeApplicationDelegate-attachBaseContext"><a href="#2-BridgeApplicationDelegate-attachBaseContext" class="headerlink" title="2. BridgeApplicationDelegate. attachBaseContext"></a>2. BridgeApplicationDelegate. attachBaseContext</h1><p>BridgeApplicationDelegate.java</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">attachBaseContext</span><span class="params">()</span>&#123;</span><br><span class="line">	<span class="comment">//2.1 hook之前准备工作</span></span><br><span class="line">	AtlasHacks.defineAndVerify();</span><br><span class="line"></span><br><span class="line">	<span class="comment">//2.2 回调预留接口</span></span><br><span class="line">   launcher.initBeforeAtlas(mRawApplication.getBaseContext());</span><br><span class="line">                </span><br><span class="line">   <span class="comment">//2.3 初始化atlas     </span></span><br><span class="line">   Atlas.getInstance().init(mRawApplication, mIsUpdated);</span><br><span class="line">     </span><br><span class="line">   <span class="comment">//2.4 处理provider    </span></span><br><span class="line">	AtlasHacks.ActivityThread$AppBindData_providers.set(mBoundApplication,<span class="literal">null</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>函数实现大概分为四个部分，也是本篇文章的重点关注部分</p>
+<ul>
+<li>hook之前的准备工作</li>
+<li>回调预留接口</li>
+<li>初始化atlas</li>
+<li>处理provider</li>
+</ul>
+<p>我们也一个来看。</p>
+<p>#3. AtlasHacks.defineAndVerify</p>
+<p>在开始分析之前，我们要知道，Android上动态加载方案，始终都绕不过三个关键的点:</p>
+<ul>
+<li><strong>动态加载class</strong> </li>
+<li><strong>动态加载资源</strong> </li>
+<li><strong>处理四大组件</strong> 能够让动态代码中的四大组件在Android上正常跑起来</li>
+</ul>
+<p>为了实现这三个目标，会在系统关键调用的地方进行Hook。比如，为了能够动态加载class，通常都会对classloader上动一些手脚，resource也是类似。</p>
+<p>这里多提一句，在四大组件的处理上，atals与插件化有着很大的差异。</p>
+<ul>
+<li>插件化的核心思想其实是埋坑机制+借尸还魂 ：通过预先在manifest中预留N个组件坑，在runtime时，通过“借尸还魂”实现四大组件的运行。</li>
+<li>atlas不一样，它是在编译期就已经各个bundle的manifest写入到apk中。所以运行时，bundle中的组件可以和常规声明的组件一样正常运行，不用再做额外的处理。</li>
+</ul>
+<p>回过头来，我们看看atlas为了实现上述目的，做了哪些准备工作。在跟进<code>defineAndVerify</code>函数的实现之前，先看一下AtlasHacks类中定义的字段</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">//AtlasHacks.java</span><br><span class="line"></span><br><span class="line"> 	// Classes</span><br><span class="line">    public static HackedClass&lt;Object&gt;                           LoadedApk;</span><br><span class="line">    public static HackedClass&lt;Object&gt;                           ActivityThread;</span><br><span class="line">    public static HackedClass&lt;android.content.res.Resources&gt;    Resources;</span><br><span class="line">    </span><br><span class="line">    // Fields</span><br><span class="line">    public static HackedField&lt;Object, Instrumentation&gt;          ActivityThread_mInstrumentation;</span><br><span class="line">    public static HackedField&lt;Object, Application&gt;              LoadedApk_mApplication;</span><br><span class="line">    public static HackedField&lt;Object, Resources&gt;                LoadedApk_mResources;</span><br><span class="line">    </span><br><span class="line">    // Methods</span><br><span class="line">    public static HackedMethod                                  ActivityThread_currentActivityThread;</span><br><span class="line">    public static HackedMethod                                  AssetManager_addAssetPath;</span><br><span class="line">    public static HackedMethod                                  Application_attach;</span><br><span class="line">    public static HackedField&lt;Object, ClassLoader&gt;              LoadedApk_mClassLoader;</span><br><span class="line">    </span><br><span class="line">    // Constructor</span><br><span class="line">    public static Hack.HackedConstructor                        PackageParser_constructor;</span><br></pre></td></tr></table></figure>
+
+<p>给这段代码点个赞，非常的干净和清晰。代码定义了atlas框架所需要hook的所有的类、方法、属性等等字段。</p>
+<ul>
+<li>处理资源，hook Resources</li>
+<li>处理class，hook LoadedApk_mClassLoader</li>
+<li>…</li>
+</ul>
+<p>现在，在看<code>defineAndVerify</code>函数的实现</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">//AtlasHacks.java</span><br><span class="line">public static boolean defineAndVerify() throws AssertionArrayException &#123;</span><br><span class="line">     allClasses();</span><br><span class="line">     allConstructors();</span><br><span class="line">     allFields();</span><br><span class="line">     allMethods();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>实际上这四个级别的函数调用，对应之前定义的字段，为这些字段进行赋值。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//AtlasHacks.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">allClasses</span><span class="params">()</span> <span class="keyword">throws</span> HackAssertionException &#123;</span><br><span class="line">	LoadedApk = Hack.into(<span class="string">&quot;android.app.LoadedApk&quot;</span>);</span><br><span class="line">	ActivityThread = Hack.into(<span class="string">&quot;android.app.ActivityThread&quot;</span>);</span><br><span class="line">	Resources = Hack.into(Resources.class);</span><br><span class="line">	ActivityManager = Hack.into(<span class="string">&quot;android.app.ActivityManager&quot;</span>);</span><br><span class="line">	<span class="comment">//...</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">allFields</span><span class="params">()</span> <span class="keyword">throws</span> HackAssertionException &#123;</span><br><span class="line">	ActivityThread_mInstrumentation = ActivityThread.field(<span class="string">&quot;mInstrumentation&quot;</span>).ofType(Instrumentation.class);</span><br><span class="line">	ActivityThread_mAllApplications = ActivityThread.field(<span class="string">&quot;mAllApplications&quot;</span>).ofGenericType(ArrayList.class);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//...</span></span><br></pre></td></tr></table></figure>
+
+<p>这几个函数的代码并不复杂，是对定义的Class、Field、Method和Contructor 这些字段进行初始化赋值工作。</p>
+<p>执行到这里时，atlas框架的准备工作完成，接下来，就是整个框架的初始化了。</p>
+<p>#4 回调预留接口</p>
+<p>时序图中的第4步，即<code>BridgeApplicationDelegate</code>的<code>attachBaseContext</code>方法中，，做了一个接口回调。</p>
+<p>BridgeApplicationDelegate.java</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">attachBaseContext</span><span class="params">()</span>&#123;</span><br><span class="line">   <span class="type">String</span> <span class="variable">preLaunchStr</span> <span class="operator">=</span> (String) RuntimeVariables.getFrameworkProperty(<span class="string">&quot;preLaunch&quot;</span>);</span><br><span class="line">   <span class="type">AtlasPreLauncher</span> <span class="variable">launcher</span> <span class="operator">=</span> (AtlasPreLauncher) Class.forName(preLaunchStr).newInstance();</span><br><span class="line">   launcher.initBeforeAtlas(mRawApplication.getBaseContext());</span><br><span class="line">   <span class="comment">//...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>函数通过“preLaunch”字段读取一个类名，反射该类上的<code>initBeforeAtlas</code>方法。<br><br><code>AtlasPreLauncher</code>实际上是一个接口，供接入者使用。在这个点，atlas还没有开始对系统进行hook，仍然是Android原生态的运行时环境。</p>
+<p>那么这个preLaunch的字段在哪里定义的呢，我们反推一下。</p>
+<p>RuntimeVariables.java</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> Object <span class="title function_">getFrameworkProperty</span><span class="params">(String fieldName)</span>&#123;</span><br><span class="line">	<span class="comment">//...</span></span><br><span class="line">	<span class="type">Field</span> <span class="variable">field</span> <span class="operator">=</span> FrameworkPropertiesClazz.getDeclaredField(fieldName);</span><br><span class="line">	<span class="keyword">return</span> field.get(FrameworkPropertiesClazz);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>实现很简单，读取<code>FrameworkProperties</code>上的静态属性字段，接着跟进。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">FrameworkProperties</span> &#123;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>什么情况，怎么什么都没有? 所谓反常即为💊，直接看反编译后的代码</p>
+<p>FrameworkProperties.java</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">FrameworkProperties</span>&#123;</span><br><span class="line">  <span class="comment">//...</span></span><br><span class="line">  <span class="keyword">public</span> <span class="keyword">static</span> String autoStartBundles;</span><br><span class="line">  <span class="keyword">public</span> <span class="keyword">static</span> String preLaunch;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">static</span>&#123;</span><br><span class="line">    autoStartBundles = <span class="string">&quot;com.taobao.firstbundle&quot;</span>;</span><br><span class="line">    preLaunch = <span class="string">&quot;com.taobao.demo.DemoPreLaunch&quot;</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>从反编译后的代码可以看到，”prelaunch”对应的内容是<code>com.taobao.demo.DemoPreLaunch</code>,那么这个值是在 <strong>什么时候写入又是在哪里配置</strong> 的呢？</p>
+<p>大家回想一下，在之前<a href="https://lucky-chen.github.io/2017/05/15/android/atlas_atlas_gradle_apk/">Atlas之由gradle开始到apk结束</a>中提到过，atlas的gradle插件在编译期搞了很多事情，我们看gradle中的设置</p>
+<figure class="highlight gradle"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">atlas&#123;</span><br><span class="line">	 tBuildConfig &#123;</span><br><span class="line">        autoStartBundles = [<span class="string">&#x27;com.taobao.firstbundle&#x27;</span>]</span><br><span class="line">        preLaunch = <span class="string">&#x27;com.taobao.demo.DemoPreLaunch&#x27;</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>和<code>FrameworkProperties</code>中的字段完美对应。</p>
+<p>这个部分牵涉开发-编译-运行三个阶段，放一张图捋一下关系。</p>
+<p><img src="/image/android/atlas_framework_property.svg"></p>
+<p>#5 atlas.init</p>
+<p>准备工作做好之后，就是初始化了。</p>
+<p>Atlas.java</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">public void init(Application application,boolean reset) &#123;</span><br><span class="line">	//读取配置项</span><br><span class="line">	ApplicationInfo appInfo = mRawApplication.get...;</span><br><span class="line">	mRealApplicationName = appInfo.metaData.getString(&quot;REAL_APPLICATION&quot;);</span><br><span class="line">	boolean multidexEnable = appInfo.metaData.getBoolean(&quot;multidex_enable&quot;);</span><br><span class="line">	</span><br><span class="line">	if(multidexEnable)&#123;</span><br><span class="line">      MultiDex.install(mRawApplication);</span><br><span class="line">   &#125;</span><br><span class="line">	//...   </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>首先是读取manifest中的配置数据<code>multidexEnable</code>和<code>mRealApplicationName</code>，这两个数据也是在编译期由atlas插件写到manifest中的。</p>
+<p><img src="/image/android/atlas_meta_data.png"></p>
+<p>multidexEnable 是true，这个在gradle中可配<br><br>mRealApplicationName 实际上是DemoApplication,即app工程在manifest中指定的启动路径。</p>
+<p>捋清楚这几个参数之后，往下看Atlas框架初始化实现</p>
+<p>Atlas.java</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">public void init(Application application,boolean reset) &#123;</span><br><span class="line">   //...</span><br><span class="line">   Atlas.getInstance().init(mRawApplication, mIsUpdated);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">public void init(Application application,boolean reset) throws AssertionArrayException, Exception &#123;</span><br><span class="line">     //...</span><br><span class="line">        </span><br><span class="line">     //1. 换classloader </span><br><span class="line">     AndroidHack.injectClassLoader(packageName, newClassLoader);</span><br><span class="line">     //2. 换Instrumentatio</span><br><span class="line">     AndroidHack.injectInstrumentationHook(new InstrumentationHook(AndroidHack.getInstrumentation(), application.getBaseContext()));</span><br><span class="line">     //3. hook ams</span><br><span class="line">     try &#123;</span><br><span class="line">         ActivityManagerDelegate activityManagerProxy = new ActivityManagerDelegate();</span><br><span class="line">         Object gDefault = null;</span><br><span class="line">         if(Build.VERSION.SDK_INT&gt;25 || (Build.VERSION.SDK_INT==25&amp;&amp;Build.VERSION.PREVIEW_SDK_INT&gt;0))&#123;</span><br><span class="line">             gDefault=AtlasHacks.ActivityManager_IActivityManagerSingleton.get(AtlasHacks.ActivityManager.getmClass());</span><br><span class="line">         &#125;else&#123;</span><br><span class="line">               gDefault=AtlasHacks.ActivityManagerNative_gDefault.get(AtlasHacks.ActivityManagerNative.getmClass());</span><br><span class="line">         &#125;</span><br><span class="line">         AtlasHacks.Singleton_mInstance.hijack(gDefault, activityManagerProxy);</span><br><span class="line">      &#125;catch(Throwable e)&#123;&#125;</span><br><span class="line">      //4. hook H</span><br><span class="line">      AndroidHack.hackH();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码，就是对系统关键节点进行了hook，具体的hook实现这里就不贴出了，如果感兴趣，可以参考<a target="_blank" rel="noopener" href="https://github.com/alibaba/atlas">demo源码</a>以及<a target="_blank" rel="noopener" href="http://weishu.me/">田维术的blog</a>，如何hook，以及为什么在这里hook，在文章中都讲的非常清楚。</p>
+<p>函数中的hook点</p>
+<table>
+<thead>
+<tr>
+<th>hook点</th>
+<th>实例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ActivityThread.mLoadedApk.mClassLoader</td>
+<td>DelegateClassLoader</td>
+</tr>
+<tr>
+<td>ActivityThread.mInstrumentation</td>
+<td>InstrumentationHook</td>
+</tr>
+<tr>
+<td>ActivityManagerNative.gDefault.get</td>
+<td>ActivityManagerDelegate</td>
+</tr>
+<tr>
+<td>android.app.ActivityThread$H.mCallback</td>
+<td>ActivityThreadHook</td>
+</tr>
+</tbody></table>
+<h1 id="6-处理provider"><a href="#6-处理provider" class="headerlink" title="6. 处理provider"></a>6. 处理provider</h1><p>在第2步的2.4部分，对provider进行了处理</p>
+<p>BridgeApplicationDelegate.java</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">attachBaseContext</span><span class="params">()</span>&#123;</span><br><span class="line">	<span class="comment">//...</span></span><br><span class="line">     </span><br><span class="line">   <span class="comment">//2.4 处理provider</span></span><br><span class="line">   <span class="type">Object</span> <span class="variable">mBoundApplication</span> <span class="operator">=</span> AtlasHacks.ActivityThread_mBoundApplication.get(activityThread);</span><br><span class="line">   mBoundApplication_provider = AtlasHacks.ActivityThread$AppBindData_providers.get(mBoundApplication);</span><br><span class="line">   <span class="keyword">if</span>(mBoundApplication_provider!=<span class="literal">null</span> &amp;&amp; mBoundApplication_provider.size()&gt;<span class="number">0</span>)&#123;</span><br><span class="line">   		AtlasHacks.ActivityThread$AppBindData_providers.set(mBoundApplication,<span class="literal">null</span>);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第4行代码读取provider数据，如果有provider信息的话，则在第6行从系统删除，让系统认为apk并没有申请任何provider。</p>
+<p>为什么这么做?回顾一下app启动的流程</p>
+<p><img src="atlas_core_start_provider_img.svg"></p>
+<p>可以看到，在第4步和第7步两个关键调用之间，第5步调用了函数<code>installContentProviders</code>,跟进去看一下。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">private void installContentProviders(Context context, List&lt;ProviderInfo&gt; providers) &#123;</span><br><span class="line">    for (ProviderInfo cpi : providers) &#123;</span><br><span class="line">    	installProvider(context, null, cpi,...);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>收集了所有provider的信息，然后调用installProvider函数</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">private IActivityManager.ContentProviderHolder installProvider(Context context,IActivityManager.ContentProviderHolder holder, ProviderInfo info,...) &#123;</span><br><span class="line">	final java.lang.ClassLoader cl = c.getClassLoader();</span><br><span class="line">   localProvider = (ContentProvider)cl.loadClass(info.name).newInstance();</span><br><span class="line">   //...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到，函数是根据在manifest中登记的provider信息，实例化对象。<br><br>__那么问题来了__，有些provider是存在于bundle中的，主dex中并不存在。如果不处理，在这里程序会因为<code>ClassNotFind</code>崩溃。所以这里要先清除掉provier的信息，延迟加载。</p>
+<hr>
+<p>上篇先到这里，各位先喝口水，再来下篇的分析。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/05/11/android/atlas_atlas_gradle_apk/" rel="prev" title="Android动态化容器框架Atlas-从gradle到apk">
+      <i class="fa fa-chevron-left"></i> Android动态化容器框架Atlas-从gradle到apk
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/05/21/android/atlas_start_2/" rel="next" title="Android动态化容器框架Atlas启动过程(下)">
+      Android动态化容器框架Atlas启动过程(下) <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A6%82%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%85%A5%E5%8F%A3"><span class="nav-number">2.</span> <span class="nav-text">入口</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#1-AtlasBridgeApplication-attachBaseContext"><span class="nav-number">3.</span> <span class="nav-text">1. AtlasBridgeApplication.attachBaseContext</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-BridgeApplicationDelegate-attachBaseContext"><span class="nav-number">4.</span> <span class="nav-text">2. BridgeApplicationDelegate. attachBaseContext</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E5%A4%84%E7%90%86provider"><span class="nav-number">5.</span> <span class="nav-text">6. 处理provider</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="lucky_chen"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">lucky_chen</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">30</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/lucky-chen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;lucky-chen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="/qh438406812@gmail.com" title="E-Mail → qh438406812@gmail.com"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">lucky_chen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

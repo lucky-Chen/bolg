@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"lucky-chen.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="概览 前端检查 ir生成 recompose判断">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Compose Compiler(1) Compose plugin">
+<meta property="og:url" content="https://lucky-chen.github.io/2022/12/30/compose/compiler_2/index.html">
+<meta property="og:site_name" content="Chen&#39;s Notes">
+<meta property="og:description" content="概览 前端检查 ir生成 recompose判断">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//compiler_lower.svg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//compose_compiler.png">
+<meta property="article:published_time" content="2022-12-29T16:00:00.000Z">
+<meta property="article:modified_time" content="2023-04-12T15:13:03.395Z">
+<meta property="article:author" content="lucky_chen">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://lucky-chen.github.io/image/compose_compiler//compiler_lower.svg">
+
+<link rel="canonical" href="https://lucky-chen.github.io/2022/12/30/compose/compiler_2/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Compose Compiler(1) Compose plugin | Chen's Notes</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Chen's Notes</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://lucky-chen.github.io/2022/12/30/compose/compiler_2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="lucky_chen">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Chen's Notes">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Compose Compiler(1) Compose plugin
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-12-30 00:00:00" itemprop="dateCreated datePublished" datetime="2022-12-30T00:00:00+08:00">2022-12-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-04-12 23:13:03" itemprop="dateModified" datetime="2023-04-12T23:13:03+08:00">2023-04-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Compose/" itemprop="url" rel="index"><span itemprop="name">Compose</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="概览"><a href="#概览" class="headerlink" title="概览"></a>概览</h1><ul>
+<li>前端检查</li>
+<li>ir生成</li>
+<li>recompose判断</li>
+</ul>
+ <span id="more"></span>
+
+<p>常见注解</p>
+<ul>
+<li>@Composable</li>
+<li>@ComposeCompilerApi</li>
+<li>@InternalComposeApi</li>
+<li>@DisallowComposableCalls</li>
+<li>@ReadOnlyComposable</li>
+<li>@NonRestartableComposable</li>
+<li>@StableMarker</li>
+<li>@Immutable</li>
+<li>@Stable</li>
+</ul>
+<h1 id="1-Frontend-checker"><a href="#1-Frontend-checker" class="headerlink" title="1. Frontend checker"></a>1. Frontend checker</h1><ul>
+<li>ComposableCallChecker : 检查是否可以调用 @Composable 函数</li>
+<li>ComposableDeclarationChecker : 检查 @Composable 的位置是否正确</li>
+<li>ComposableTargetChecker</li>
+<li>ComposeDiagnosticSuppressor : 屏蔽不必要的编译诊断错误</li>
+</ul>
+<h1 id="2-IRCodeLower"><a href="#2-IRCodeLower" class="headerlink" title="2. IRCodeLower"></a>2. IRCodeLower</h1><p>Lowering 是编译原理中的概念，在编译过程的每一步，使用不同的 Lower 来来逐步删除高级特征，并生成更低级别特征的 IR。这样做足够多次，最终你会得到一个足够简单的IR，可以编译到汇编级</p>
+<p><img src="/image/compose_compiler//compiler_lower.svg"></p>
+<p><a target="_blank" rel="noopener" href="https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:compose/compiler/compiler-hosted/src/main/java/androidx/compose/compiler/plugins/kotlin/ComposeIrGenerationExtension.kt">ComposeIrGenerationExtension.kt</a></p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">ComposeIrGenerationExtension</span>(...) : IrGenerationExtension &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">generate</span><span class="params">(moduleFragment: <span class="type">IrModuleFragment</span>,pluginContext: <span class="type">IrPluginContext</span>)</span></span> &#123;</span><br><span class="line">      </span><br><span class="line">        ClassStabilityTransformer(pluginContext,<span class="comment">//..)</span></span><br><span class="line">            .lower(moduleFragment)</span><br><span class="line"></span><br><span class="line">        LiveLiteralTransformer( pluginContext, <span class="comment">//..)</span></span><br><span class="line">            .lower(moduleFragment)</span><br><span class="line"></span><br><span class="line">        ComposableFunInterfaceLowering(pluginContext)</span><br><span class="line">            .lower(moduleFragment)</span><br><span class="line"></span><br><span class="line">        <span class="comment">// Memoize normal lambdas and wrap composable lambdas</span></span><br><span class="line">        ComposerLambdaMemoization( pluginContext, <span class="comment">//..)</span></span><br><span class="line">            .lower(moduleFragment)</span><br><span class="line"></span><br><span class="line">        CopyDefaultValuesFromExpectLowering()</span><br><span class="line">            .lower(moduleFragment)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (decoysEnabled) &#123; &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// transform all composable functions to have an extra synthetic composer</span></span><br><span class="line">        <span class="comment">// parameter. this will also transform all types and calls to include the extra</span></span><br><span class="line">        <span class="comment">// parameter.</span></span><br><span class="line">        ComposerParamTransformer(pluginContext, <span class="comment">//..)</span></span><br><span class="line">            .lower(moduleFragment)</span><br><span class="line"></span><br><span class="line">        ComposableTargetAnnotationsTransformer(pluginContext,<span class="comment">//..)</span></span><br><span class="line">            .lower(moduleFragment)</span><br><span class="line"></span><br><span class="line">        <span class="comment">// transform calls to the currentComposer to just use the local parameter from the</span></span><br><span class="line">        <span class="comment">// previous transform</span></span><br><span class="line">        ComposerIntrinsicTransformer(pluginContext, decoysEnabled)</span><br><span class="line">            .lower(moduleFragment)</span><br><span class="line"></span><br><span class="line">        ComposableFunctionBodyTransformer(pluginContext,<span class="comment">//..)</span></span><br><span class="line">            .lower(moduleFragment)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (decoysEnabled) &#123; &#125;</span><br><span class="line">        <span class="keyword">if</span> (isKlibTarget) &#123; &#125;</span><br><span class="line">        <span class="keyword">if</span> (pluginContext.platform.isJs()) &#123;&#125;   </span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a target="_blank" rel="noopener" href="https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:compose/compiler/compiler-hosted/src/main/java/androidx/compose/compiler/plugins/kotlin/lower/">各种lower代码地址</a></p>
+<h3 id="2-1-ClassStabilityTransformer"><a href="#2-1-ClassStabilityTransformer" class="headerlink" title="2.1 ClassStabilityTransformer"></a>2.1 ClassStabilityTransformer</h3><p>判断类型稳定性, 为 Class 添加@StabilityInferred 注解, 并为 Class 生成 $stable 静态变量，服务于 Stability.Runtime 的代码生成。(用于后续compose判断重组代码生成)</p>
+<h3 id="2-2-LiveLiteralTransformer"><a href="#2-2-LiveLiteralTransformer" class="headerlink" title="2.2 LiveLiteralTransformer"></a>2.2 LiveLiteralTransformer</h3><p>将常量文字表达式转换为读取 MutableState 实例的表达式，以便无需重新编译即可将对常量文字源代码的更改传达给运行时。 这种转变旨在改善开发人员体验，永远不应在发布版本中启用，因为它会显着放慢对性能敏感的代码</p>
+<p>在gradle的<a target="_blank" rel="noopener" href="https://developer.android.com/reference/tools/gradle-api/8.0/com/android/build/api/dsl/ComposeOptions">ComposeOption中</a> 使用useLiveLiterals开启/关闭</p>
+<figure class="highlight gradle"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//file: Foo.kt origin </span></span><br><span class="line">fun Foo() &#123;</span><br><span class="line">    <span class="keyword">print</span>(<span class="string">&quot;Hello World&quot;</span>)</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//file: Foo.kt into </span></span><br><span class="line">fun Foo() &#123;</span><br><span class="line">    <span class="keyword">print</span>(LiveLiterals$FooKt.getString$arg-<span class="number">0</span>$<span class="keyword">call</span>-<span class="keyword">print</span>$fun-Foo())</span><br><span class="line">&#125;</span><br><span class="line"> </span><br><span class="line">object LiveLiterals$FooKt &#123;</span><br><span class="line">    var String$arg-<span class="number">0</span>$<span class="keyword">call</span>-<span class="keyword">print</span>$fun-Foo: String = <span class="string">&quot;Hello World&quot;</span></span><br><span class="line">    var State$String$arg-<span class="number">0</span>$<span class="keyword">call</span>-<span class="keyword">print</span>$fun-Foo: MutableState&lt;String&gt;? = <span class="keyword">null</span></span><br><span class="line">    </span><br><span class="line">    fun getString$arg-<span class="number">0</span>$<span class="keyword">call</span>-<span class="keyword">print</span>$fun-Foo(): String &#123;</span><br><span class="line">        val field = <span class="keyword">this</span>.String$arg-<span class="number">0</span>$<span class="keyword">call</span>-<span class="keyword">print</span>$fun-Foo</span><br><span class="line">        val state = <span class="keyword">if</span> (field == <span class="keyword">null</span>) &#123;</span><br><span class="line">            val tmp = liveLiteral(</span><br><span class="line">                <span class="string">&quot;String$arg-0$call-print$fun-Foo&quot;</span>,</span><br><span class="line">                <span class="keyword">this</span>.String$arg-<span class="number">0</span>$<span class="keyword">call</span>-<span class="keyword">print</span>$fun-Foo</span><br><span class="line">            )</span><br><span class="line">            <span class="keyword">this</span>.String$arg-<span class="number">0</span>$<span class="keyword">call</span>-<span class="keyword">print</span>$fun-Foo = tmp</span><br><span class="line">            tmp</span><br><span class="line">         &#125; <span class="keyword">else</span> field</span><br><span class="line">      <span class="keyword">return</span> field.value</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-3-ComposableFunInterfaceLowering"><a href="#2-3-ComposableFunInterfaceLowering" class="headerlink" title="2.3 ComposableFunInterfaceLowering"></a>2.3 ComposableFunInterfaceLowering</h3><h3 id="2-4-ComposerLambdaMemoization"><a href="#2-4-ComposerLambdaMemoization" class="headerlink" title="2.4 ComposerLambdaMemoization"></a>2.4 ComposerLambdaMemoization</h3><h3 id="2-5-CopyDefaultValuesFromExpectLowering"><a href="#2-5-CopyDefaultValuesFromExpectLowering" class="headerlink" title="2.5 CopyDefaultValuesFromExpectLowering"></a>2.5 CopyDefaultValuesFromExpectLowering</h3><h3 id="2-6-ComposerParamTransformer"><a href="#2-6-ComposerParamTransformer" class="headerlink" title="2.6 ComposerParamTransformer"></a>2.6 ComposerParamTransformer</h3><p>为<code>@Composable</code> 函数增加 $compsoer 等参数</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Composable</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">Counter</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="comment">//..</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//转换成</span></span><br><span class="line"><span class="meta">@Composable</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">Counter</span><span class="params">($composer:<span class="type">Composer</span>, $changed: <span class="type">Int</span>)</span></span> &#123; </span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>源码部分</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">// 1.添加$composer参数</span><br><span class="line">val composerParam = fn.addValueParameter &#123;</span><br><span class="line">                name = KtxNameConventions.COMPOSER_PARAMETER</span><br><span class="line">                type = composerType.makeNullable()</span><br><span class="line">                origin = IrDeclarationOrigin.DEFINED</span><br><span class="line">                isAssignable = true</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 2.添加$changed[n]参数</span><br><span class="line">val changed = KtxNameConventions.CHANGED_PARAMETER.identifier</span><br><span class="line">for (i in 0 until changedParamCount(realParams, fn.thisParamCount)) &#123;</span><br><span class="line">    fn.addValueParameter(</span><br><span class="line">        if (i == 0) changed else &quot;$changed$i&quot;,</span><br><span class="line">        context.irBuiltIns.intType</span><br><span class="line">     )</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// 3.添加$default[n]参数</span><br><span class="line">if (oldFn.requiresDefaultParameter()) &#123;</span><br><span class="line">    val defaults = KtxNameConventions.DEFAULT_PARAMETER.identifier</span><br><span class="line">    for (i in 0 until defaultParamCount(currentParams)) &#123;</span><br><span class="line">        fn.addValueParameter(</span><br><span class="line">            if (i == 0) defaults else &quot;$defaults$i&quot;,</span><br><span class="line">            context.irBuiltIns.intType,</span><br><span class="line">            IrDeclarationOrigin.MASK_FOR_DEFAULT_FUNCTION</span><br><span class="line">        )</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-7-ComposableTargetAnnotationsTransformer"><a href="#2-7-ComposableTargetAnnotationsTransformer" class="headerlink" title="2.7 ComposableTargetAnnotationsTransformer"></a>2.7 ComposableTargetAnnotationsTransformer</h3><h3 id="2-8-ComposerIntrinsicTransformer"><a href="#2-8-ComposerIntrinsicTransformer" class="headerlink" title="2.8 ComposerIntrinsicTransformer"></a>2.8 ComposerIntrinsicTransformer</h3><h3 id="2-9-ComposableFunctionBodyTransformer"><a href="#2-9-ComposableFunctionBodyTransformer" class="headerlink" title="2.9 ComposableFunctionBodyTransformer"></a>2.9 ComposableFunctionBodyTransformer</h3><p>非常复杂的一个trasnfromer, Composable 函数体内生成 startXXXGroup/endXXXGroup/recompose 等相关代码</p>
+<p><img src="/image/compose_compiler//compose_compiler.png"></p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * This IR Transform is responsible for the main transformations of the body of a composable</span></span><br><span class="line"><span class="comment"> * function.</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * 1. Control-Flow Group Generation</span></span><br><span class="line"><span class="comment"> * 2. Default arguments</span></span><br><span class="line"><span class="comment"> * 3. Composable Function Skipping</span></span><br><span class="line"><span class="comment"> * 4. Comparison Propagation</span></span><br><span class="line"><span class="comment"> * 5. Recomposability</span></span><br><span class="line"><span class="comment"> * 6. Source location information (when enabled)</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"></span></span><br></pre></td></tr></table></figure>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/12/25/compose/compiler_1/" rel="prev" title="Compose Compiler(1) kotlin编译架构&&KCP">
+      <i class="fa fa-chevron-left"></i> Compose Compiler(1) kotlin编译架构&&KCP
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/02/15/compose/compose/" rel="next" title="Compose架构模块梳理">
+      Compose架构模块梳理 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A6%82%E8%A7%88"><span class="nav-number">1.</span> <span class="nav-text">概览</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Frontend-checker"><span class="nav-number">2.</span> <span class="nav-text">1. Frontend checker</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-IRCodeLower"><span class="nav-number">3.</span> <span class="nav-text">2. IRCodeLower</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-ClassStabilityTransformer"><span class="nav-number">3.0.1.</span> <span class="nav-text">2.1 ClassStabilityTransformer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-LiveLiteralTransformer"><span class="nav-number">3.0.2.</span> <span class="nav-text">2.2 LiveLiteralTransformer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-ComposableFunInterfaceLowering"><span class="nav-number">3.0.3.</span> <span class="nav-text">2.3 ComposableFunInterfaceLowering</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-ComposerLambdaMemoization"><span class="nav-number">3.0.4.</span> <span class="nav-text">2.4 ComposerLambdaMemoization</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-CopyDefaultValuesFromExpectLowering"><span class="nav-number">3.0.5.</span> <span class="nav-text">2.5 CopyDefaultValuesFromExpectLowering</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-6-ComposerParamTransformer"><span class="nav-number">3.0.6.</span> <span class="nav-text">2.6 ComposerParamTransformer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-7-ComposableTargetAnnotationsTransformer"><span class="nav-number">3.0.7.</span> <span class="nav-text">2.7 ComposableTargetAnnotationsTransformer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-8-ComposerIntrinsicTransformer"><span class="nav-number">3.0.8.</span> <span class="nav-text">2.8 ComposerIntrinsicTransformer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-9-ComposableFunctionBodyTransformer"><span class="nav-number">3.0.9.</span> <span class="nav-text">2.9 ComposableFunctionBodyTransformer</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="lucky_chen"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">lucky_chen</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">30</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/lucky-chen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;lucky-chen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="/qh438406812@gmail.com" title="E-Mail → qh438406812@gmail.com"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">lucky_chen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

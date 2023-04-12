@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"lucky-chen.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="概览Compose compiler是compose框架的一部分, 本质是一个kcp(kotlin compiler plugin),用于支持编译期针对compose特性进行静态检查和代码生成.   在进入compose的编译之前, 需要事先对kotlin的编译架构、过程以及概念做一些探究储备">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Compose Compiler(1) kotlin编译架构&amp;&amp;KCP">
+<meta property="og:url" content="https://lucky-chen.github.io/2022/12/25/compose/compiler_1/index.html">
+<meta property="og:site_name" content="Chen&#39;s Notes">
+<meta property="og:description" content="概览Compose compiler是compose框架的一部分, 本质是一个kcp(kotlin compiler plugin),用于支持编译期针对compose特性进行静态检查和代码生成.   在进入compose的编译之前, 需要事先对kotlin的编译架构、过程以及概念做一些探究储备">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//compose_layer.PNG">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//kotlin_k2_compiler.PNG">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//kotlin_k1_compiler.svg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//kotlin_k1_frond.PNG">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//kotlin_compiler_k1_backend.PNG">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//kotlin_compiler_k2.svg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//kotlin_compiler_k2_frond.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//kotlin_compiler_k2_bacend.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/compose_compiler//kcp.png">
+<meta property="article:published_time" content="2022-12-24T16:00:00.000Z">
+<meta property="article:modified_time" content="2023-04-12T15:12:56.777Z">
+<meta property="article:author" content="lucky_chen">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://lucky-chen.github.io/image/compose_compiler//compose_layer.PNG">
+
+<link rel="canonical" href="https://lucky-chen.github.io/2022/12/25/compose/compiler_1/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Compose Compiler(1) kotlin编译架构&&KCP | Chen's Notes</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Chen's Notes</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://lucky-chen.github.io/2022/12/25/compose/compiler_1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="lucky_chen">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Chen's Notes">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Compose Compiler(1) kotlin编译架构&&KCP
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-12-25 00:00:00" itemprop="dateCreated datePublished" datetime="2022-12-25T00:00:00+08:00">2022-12-25</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-04-12 23:12:56" itemprop="dateModified" datetime="2023-04-12T23:12:56+08:00">2023-04-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Compose/" itemprop="url" rel="index"><span itemprop="name">Compose</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="概览"><a href="#概览" class="headerlink" title="概览"></a>概览</h1><p>Compose compiler是compose框架的一部分, 本质是一个kcp(kotlin compiler plugin),用于支持编译期针对compose特性进行静态检查和代码生成.</p>
+<p><img src="/image/compose_compiler//compose_layer.PNG"></p>
+<p> 在进入compose的编译之前, 需要事先对kotlin的编译架构、过程以及概念做一些探究储备</p>
+ <span id="more"></span>
+
+<h1 id="kotlin编译过程简介"><a href="#kotlin编译过程简介" class="headerlink" title="kotlin编译过程简介"></a>kotlin编译过程简介</h1><p><a target="_blank" rel="noopener" href="https://blog.jetbrains.com/kotlin/2021/10/the-road-to-the-k2-compiler/">The Road to the K2 Compiler | The Kotlin Blog</a></p>
+<ul>
+<li>Frontend（编译器前端）：对源代码分析得到 AST （抽象语法树）以及符号表，并完成静态检查</li>
+<li>Backend（编译器后端）：基于 AST/IR等前端产物，生成平台目标代码<br>kotlin的编译有 k1和k2两个版本, 目前最新版都已切换成k2架构.</li>
+</ul>
+<p><img src="/image/compose_compiler//kotlin_k2_compiler.PNG"><br>下面我们了解一下k1和k2 </p>
+<h2 id="k1编译器"><a href="#k1编译器" class="headerlink" title="k1编译器"></a>k1编译器</h2><p><img src="/image/compose_compiler//kotlin_k1_compiler.svg"></p>
+<h3 id="Frontend"><a href="#Frontend" class="headerlink" title="Frontend"></a>Frontend</h3><figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">interface</span> <span class="title class_">Cat</span> &#123; </span><br><span class="line">    <span class="function"><span class="keyword">fun</span> void <span class="title">meow</span><span class="params">()</span></span></span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Pet</span>:<span class="type">Cat</span> &#123;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> void <span class="title">meow</span><span class="params">()</span></span>&#123;&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">void <span class="function"><span class="keyword">fun</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (pet <span class="keyword">is</span> Cat) &#123;</span><br><span class="line">        pet.meow()</span><br><span class="line">    &#125;<span class="keyword">else</span> &#123;</span><br><span class="line">        print(<span class="string">&quot;*&quot;</span>)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>通过parser和语义分析, 生成语法树PSI(Program Structure Interface) 语义信息(BindingContext)</p>
+<ul>
+<li>PSI存储对应的语法结构信息 (一颗tree,包含字符串以及调用结构顺序)</li>
+<li>BindingContext存储对应的语义信息 ( 这是一个什么类的什么变量、这是一个函数调用)</li>
+</ul>
+<p><img src="/image/compose_compiler//kotlin_k1_frond.PNG"></p>
+<h3 id="Bacend"><a href="#Bacend" class="headerlink" title="Bacend"></a>Bacend</h3><ul>
+<li>js、jvm后端直接使用生成的语法树和语义信息, 编译对应的后端产物</li>
+<li>native后端开始, kotlin团队决定引入中间表示: IR 产物, 通过 IR再生成对应的汇编机器码</li>
+</ul>
+<p><img src="/image/compose_compiler//kotlin_compiler_k1_backend.PNG"></p>
+<h2 id="k2编译器"><a href="#k2编译器" class="headerlink" title="k2编译器"></a>k2编译器</h2><p><img src="/image/compose_compiler//kotlin_compiler_k2.svg"></p>
+<p>K2编译器主要的特性有2点</p>
+<ul>
+<li>引入了中间ir表示:  前端FIR + 中间产物IR</li>
+<li>引入插件机制: 允许开发者通过注册插件,在前端编译过程 和 后端过程操作IR进行code的生成和变化. </li>
+</ul>
+<blockquote>
+<p>Compose 编译器只能工作在k2编译架构上, 因为compose的compiler实际上是一个KCP(kotlin compile pugin)</p>
+</blockquote>
+<h3 id="Frontend-1"><a href="#Frontend-1" class="headerlink" title="Frontend"></a>Frontend</h3><p>FIR  =  BindingContxt + PSI  合并.</p>
+<ul>
+<li>提升前端静态分析&amp;&amp;检查的性能 (比如频繁修改局部代码, 基于FIR做了大量性能优化)<br>ide的kotlin插件复用了kotlin编译器的前端编译部分</li>
+<li>做一些简单的脱糖&amp;&amp;代码生成工作 (K1做不了, 因为k2支持对FIR树结构进行编辑和变化)</li>
+</ul>
+<p><img src="/image/compose_compiler//kotlin_compiler_k2_frond.png"></p>
+<h3 id="Bacend-1"><a href="#Bacend-1" class="headerlink" title="Bacend"></a>Bacend</h3><p>统一使用中间IR作为输入, 然后进行优化, 最后调用对应平台后端来生成平台目标代码</p>
+<p><img src="/image/compose_compiler//kotlin_compiler_k2_bacend.png"></p>
+<h1 id="KCP简介-kotlin-compiler-plugin"><a href="#KCP简介-kotlin-compiler-plugin" class="headerlink" title="KCP简介 (kotlin compiler plugin)"></a>KCP简介 (kotlin compiler plugin)</h1><h2 id="Kcp-结构开发流程"><a href="#Kcp-结构开发流程" class="headerlink" title="Kcp 结构开发流程"></a>Kcp 结构开发流程</h2><p><img src="/image/compose_compiler//kcp.png"></p>
+<p>Gradle Plugin：</p>
+<ul>
+<li>Plugin：KCP 是通过 Gradle 配置的，需要定义一个 Gradle 插件，并在 Gradle 中配置 KCP 所需的编译参数。</li>
+<li>Subplugin： 建立从 Gradle Plugin 到 Kotlin Plugin 的连接，并将 Gradle 中配置的参数传递给 Kotlin Plugin<br>Kotlin Plugin：</li>
+<li>CommandLineProcessor：KCP 的入口，定义 KCP 的 id、解析命令行参数等</li>
+<li>ComponentRegister：注册 KCP 中的 Extension 扩展点。它与 CommandLineProcessor 一样都是通过 SPI 调用，需要添加 auto-service 注解</li>
+<li>XXExtension：这是实现 KCP 逻辑的地方。Kotlin 提供了许多类型的 Extension 供我们实现。编译器会在前端、后端的各个编译环节中调用 KCP 注册的对应类型的 Extension。例如 ExpressionCodegenExtension 可用来修改 Class 的 Body；ClassBuilderInterceptorExtension 可以修改 Class 的 Definition 等等</li>
+</ul>
+<h2 id="举个例子"><a href="#举个例子" class="headerlink" title="举个例子"></a>举个例子</h2><p>针对kotlin的数据类<br>data class People(var name:String,var age:Int,var sex:Int)<br>对于data类型, kotlin编译器会默认生成</p>
+<ul>
+<li>带参数的构造函数</li>
+<li>参数的get/set</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">class</span> <span class="title class_">People</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> String name;</span><br><span class="line">    <span class="keyword">private</span> int age;</span><br><span class="line">    <span class="keyword">private</span> int sex;</span><br><span class="line">    <span class="keyword">final</span> String getName() &#123; <span class="keyword">return</span> <span class="keyword">this</span>.name; &#125;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">final</span> void setName(String var1) &#123;&#125;</span><br><span class="line">    <span class="comment">//有参构造函数</span></span><br><span class="line">    <span class="keyword">public</span> People(String name, int age, int sex) &#123; </span><br><span class="line">        <span class="keyword">super</span>(); </span><br><span class="line">        <span class="keyword">this</span>.name = name; </span><br><span class="line">        <span class="keyword">this</span>.age = age; </span><br><span class="line">        <span class="keyword">this</span>.sex = sex; &#125;     </span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>使用时只能传参：<br>People people=new People(“lei”,23,1);<br>但是在一些框架中(Kotlin+Spring Boot), 需要反射无参构造函数, 来初始化数据类, 但是data类型的默认生成有参构造, 无法完成这个功能. kotlin官方提供一个NoArg插件 解决这个问题</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@NoArg</span></span><br><span class="line"><span class="keyword">data</span> <span class="keyword">class</span> <span class="title class_">People</span>(<span class="keyword">var</span> name:String,<span class="keyword">var</span> age:<span class="built_in">Int</span>,<span class="keyword">var</span> sex:<span class="built_in">Int</span>)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">//生成的代码</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">People</span> &#123;</span><br><span class="line">    <span class="comment">//NoArg 生成的无参构造函数</span></span><br><span class="line">    <span class="keyword">public</span> People()&#123;&#125;</span><br><span class="line">    <span class="comment">//默认生成</span></span><br><span class="line">    <span class="keyword">public</span> People(<span class="meta">@NotNull</span> String name, int age, int sex)</span><br><span class="line">    <span class="comment">//get/set </span></span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+<ul>
+<li><a target="_blank" rel="noopener" href="https://cs.android.com/android-studio/kotlin/+/master:plugins/noarg/noarg.k2/src/org/jetbrains/kotlin/noarg/fir/FirNoArgDeclarationChecker.kt">FirNoArgDeclarationChecker</a>：新的 K2 前端，可基于 FIR 检查 InnerClass</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">object</span> FirNoArgDeclarationChecker : FirRegularClassChecker() &#123;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">check</span><span class="params">(declaration: <span class="type">FirRegularClass</span>, context: <span class="type">CheckerContext</span>, reporter: <span class="type">DiagnosticReporter</span>)</span></span> &#123;</span><br><span class="line">        <span class="keyword">val</span> source = declaration.source ?: <span class="keyword">return</span></span><br><span class="line">        <span class="keyword">if</span> (declaration.classKind != ClassKind.CLASS) <span class="keyword">return</span></span><br><span class="line">        <span class="keyword">val</span> matcher = context.session.noArgPredicateMatcher</span><br><span class="line">        <span class="keyword">if</span> (!matcher.isAnnotated(declaration.symbol)) <span class="keyword">return</span></span><br><span class="line"></span><br><span class="line">        <span class="keyword">when</span> &#123;</span><br><span class="line">            declaration.isInner -&gt; reporter.reportOn(source, KtErrorsNoArg.NOARG_ON_INNER_CLASS_ERROR, context)</span><br><span class="line">            declaration.isLocal -&gt; reporter.reportOn(source, KtErrorsNoArg.NOARG_ON_LOCAL_CLASS_ERROR, context)</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">val</span> superClassSymbol = declaration.symbol.getSuperClassSymbolOrAny(context.session)</span><br><span class="line">        <span class="keyword">if</span> (superClassSymbol.declarationSymbols.filterIsInstance&lt;FirConstructorSymbol&gt;().none &#123; it.isNoArgConstructor() &#125; &amp;&amp; !matcher.isAnnotated(superClassSymbol)) &#123;</span><br><span class="line">            reporter.reportOn(source, KtErrorsNoArg.NO_NOARG_CONSTRUCTOR_IN_SUPERCLASS, context)</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> FirRegularClassSymbol.<span class="title">getSuperClassSymbolOrAny</span><span class="params">(session: <span class="type">FirSession</span>)</span></span>: FirRegularClassSymbol &#123;</span><br><span class="line">        <span class="keyword">for</span> (superType <span class="keyword">in</span> resolvedSuperTypes) &#123;</span><br><span class="line">            <span class="keyword">val</span> symbol = superType.fullyExpandedType(session).toRegularClassSymbol(session) ?: <span class="keyword">continue</span></span><br><span class="line">            <span class="keyword">if</span> (symbol.classKind == ClassKind.CLASS) <span class="keyword">return</span> symbol</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> session.builtinTypes.anyType.type.toRegularClassSymbol(session) ?: error(<span class="string">&quot;Symbol for Any not found&quot;</span>)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> FirConstructorSymbol.<span class="title">isNoArgConstructor</span><span class="params">()</span></span>: <span class="built_in">Boolean</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> valueParameterSymbols.all &#123; it.hasDefaultValue &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><a target="_blank" rel="noopener" href="https://cs.android.com/android-studio/kotlin/+/master:plugins/noarg/noarg.backend/src/org/jetbrains/kotlin/noarg/NoArgIrGenerationExtension.kt">NoArgIrGenerationExtension</a>：继承自 IrGenerationExtension ，基于 IR 添加无参构造函数</li>
+</ul>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">NoArgIrGenerationExtension</span>(...) : IrGenerationExtension &#123;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">generate</span><span class="params">(moduleFragment: <span class="type">IrModuleFragment</span>, pluginContext: <span class="type">IrPluginContext</span>)</span></span> &#123;</span><br><span class="line">        moduleFragment.accept(NoArgIrTransformer(pluginContext, annotations, invokeInitializers), <span class="literal">null</span>)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">class</span> <span class="title class_">NoArgIrTransformer</span>(</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">val</span> context: IrPluginContext,</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">val</span> annotations: List&lt;String&gt;,</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">val</span> invokeInitializers: <span class="built_in">Boolean</span>,) : AnnotationBasedExtension, IrElementVisitorVoid &#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//使用IR的API生成无参构造函数</span></span><br><span class="line">    <span class="keyword">private</span> <span class="function"><span class="keyword">fun</span> <span class="title">getOrGenerateNoArgConstructor</span><span class="params">(klass: <span class="type">IrClass</span>)</span></span>: IrConstructor = noArgConstructors.getOrPut(klass) &#123;</span><br><span class="line">        <span class="comment">//1. 创建一个构造函数</span></span><br><span class="line">        context.irFactory.buildConstructor &#123;</span><br><span class="line">            startOffset = SYNTHETIC_OFFSET</span><br><span class="line">            endOffset = SYNTHETIC_OFFSET</span><br><span class="line">            returnType = klass.defaultType</span><br><span class="line">        &#125;.also &#123; ctor -&gt;</span><br><span class="line">            ctor.parent = klass</span><br><span class="line">            ctor.body = context.irFactory.createBlockBody(</span><br><span class="line">                ctor.startOffset, ctor.endOffset,</span><br><span class="line">                listOfNotNull(</span><br><span class="line">                    IrDelegatingConstructorCallImpl(</span><br><span class="line">                        ctor.startOffset, ctor.endOffset, context.irBuiltIns.unitType,</span><br><span class="line">                        superConstructor.symbol, <span class="number">0</span>, superConstructor.valueParameters.size</span><br><span class="line">                    ),</span><br><span class="line">                    IrInstanceInitializerCallImpl(</span><br><span class="line">                        ctor.startOffset, ctor.endOffset, klass.symbol, context.irBuiltIns.unitType</span><br><span class="line">                    ).takeIf &#123; invokeInitializers &#125;</span><br><span class="line">                )</span><br><span class="line">            )</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="Compose-compiler"><a href="#Compose-compiler" class="headerlink" title="Compose compiler"></a>Compose compiler</h2><p>Compose Compiler 是一个 KCP, 核心在于其实现逻辑的Extension . 入口在ComposePlugin.kt</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">ComposeComponentRegistrar</span> : <span class="type">ComponentRegistrar</span> &#123;</span><br><span class="line">    <span class="keyword">override</span> <span class="function"><span class="keyword">fun</span> <span class="title">registerProjectComponents</span><span class="params">(...)</span></span> &#123;</span><br><span class="line">        registerCommonExtensions(project)</span><br><span class="line">        registerIrExtension(project, configuration)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//frontend 部分</span></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">registerCommonExtensions</span><span class="params">(project: <span class="type">Project</span>)</span></span> &#123;</span><br><span class="line">        StorageComponentContainerContributor.registerExtension(</span><br><span class="line">            project,</span><br><span class="line">            ComposableCallChecker()</span><br><span class="line">        )</span><br><span class="line">        StorageComponentContainerContributor.registerExtension(</span><br><span class="line">            project,</span><br><span class="line">            ComposableDeclarationChecker()</span><br><span class="line">        )</span><br><span class="line">        StorageComponentContainerContributor.registerExtension(</span><br><span class="line">            project,</span><br><span class="line">            ComposableTargetChecker()</span><br><span class="line">        )</span><br><span class="line">        <span class="comment">//用于抑制语法错误</span></span><br><span class="line">        ComposeDiagnosticSuppressor.registerExtension(</span><br><span class="line">            project,</span><br><span class="line">            ComposeDiagnosticSuppressor()</span><br><span class="line">        )</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//bacend 操作IR部分</span></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">registerIrExtension</span><span class="params">(</span></span></span><br><span class="line"><span class="params"><span class="function">        project: <span class="type">Project</span>,</span></span></span><br><span class="line"><span class="params"><span class="function">        configuration: <span class="type">CompilerConfiguration</span></span></span></span><br><span class="line"><span class="params"><span class="function">    )</span></span> &#123;</span><br><span class="line">        IrGenerationExtension.registerExtension(</span><br><span class="line">            project,</span><br><span class="line">            ComposeIrGenerationExtension(</span><br><span class="line">                liveLiteralsEnabled = liveLiteralsEnabled,</span><br><span class="line">                liveLiteralsV2Enabled = liveLiteralsV2Enabled,</span><br><span class="line">                generateFunctionKeyMetaClasses = generateFunctionKeyMetaClasses,</span><br><span class="line">                sourceInformationEnabled = sourceInformationEnabled,</span><br><span class="line">                intrinsicRememberEnabled = intrinsicRememberEnabled,</span><br><span class="line">                decoysEnabled = decoysEnabled,</span><br><span class="line">                metricsDestination = metricsDestination,</span><br><span class="line">                reportsDestination = reportsDestination,</span><br><span class="line">                validateIr = validateIr,</span><br><span class="line">            )</span><br><span class="line">        )</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h1 id="附录"><a href="#附录" class="headerlink" title="附录"></a>附录</h1><ul>
+<li><a target="_blank" rel="noopener" href="https://blog.jetbrains.com/kotlin/2021/10/the-road-to-the-k2-compiler/">The Road to the K2 Compiler | The Kotlin Blog</a></li>
+<li><a target="_blank" rel="noopener" href="https://resources.jetbrains.com/storage/products/kotlinconf2018/slides/5_Writing%20Your%20First%20Kotlin%20Compiler%20Plugin.pdf">Writing Your First Kotlin Compiler Plugin</a></li>
+<li><a target="_blank" rel="noopener" href="https://juejin.cn/post/7153076275207208991">深入浅出 Compose Compiler(1) Kotlin Compiler &amp; KCP - 掘金</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/07/15/flutter/flutter_iot/" rel="prev" title="Flutter移植嵌入式linux设备、IOT方向探索">
+      <i class="fa fa-chevron-left"></i> Flutter移植嵌入式linux设备、IOT方向探索
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/12/30/compose/compiler_2/" rel="next" title="Compose Compiler(1) Compose plugin">
+      Compose Compiler(1) Compose plugin <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A6%82%E8%A7%88"><span class="nav-number">1.</span> <span class="nav-text">概览</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#kotlin%E7%BC%96%E8%AF%91%E8%BF%87%E7%A8%8B%E7%AE%80%E4%BB%8B"><span class="nav-number">2.</span> <span class="nav-text">kotlin编译过程简介</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#k1%E7%BC%96%E8%AF%91%E5%99%A8"><span class="nav-number">2.1.</span> <span class="nav-text">k1编译器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Frontend"><span class="nav-number">2.1.1.</span> <span class="nav-text">Frontend</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Bacend"><span class="nav-number">2.1.2.</span> <span class="nav-text">Bacend</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#k2%E7%BC%96%E8%AF%91%E5%99%A8"><span class="nav-number">2.2.</span> <span class="nav-text">k2编译器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Frontend-1"><span class="nav-number">2.2.1.</span> <span class="nav-text">Frontend</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Bacend-1"><span class="nav-number">2.2.2.</span> <span class="nav-text">Bacend</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#KCP%E7%AE%80%E4%BB%8B-kotlin-compiler-plugin"><span class="nav-number">3.</span> <span class="nav-text">KCP简介 (kotlin compiler plugin)</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Kcp-%E7%BB%93%E6%9E%84%E5%BC%80%E5%8F%91%E6%B5%81%E7%A8%8B"><span class="nav-number">3.1.</span> <span class="nav-text">Kcp 结构开发流程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BE%E4%B8%AA%E4%BE%8B%E5%AD%90"><span class="nav-number">3.2.</span> <span class="nav-text">举个例子</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Compose-compiler"><span class="nav-number">3.3.</span> <span class="nav-text">Compose compiler</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%99%84%E5%BD%95"><span class="nav-number">4.</span> <span class="nav-text">附录</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="lucky_chen"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">lucky_chen</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">30</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/lucky-chen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;lucky-chen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="/qh438406812@gmail.com" title="E-Mail → qh438406812@gmail.com"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">lucky_chen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

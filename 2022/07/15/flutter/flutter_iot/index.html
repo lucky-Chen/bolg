@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"lucky-chen.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="背景iot有着很广阔的场景: 艾瑞咨询-积基“数”本、重塑产业：中国物联网行业研究报告-220129. 智慧城市、车联网、智慧零售、智能家居、智能工厂.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flutter移植嵌入式linux设备、IOT方向探索">
+<meta property="og:url" content="https://lucky-chen.github.io/2022/07/15/flutter/flutter_iot/index.html">
+<meta property="og:site_name" content="Chen&#39;s Notes">
+<meta property="og:description" content="背景iot有着很广阔的场景: 艾瑞咨询-积基“数”本、重塑产业：中国物联网行业研究报告-220129. 智慧城市、车联网、智慧零售、智能家居、智能工厂.">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/iot_bussness.PNG">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/flutter_tech.svg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/flutter_iot_explore.jpg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/flutter_gtk.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/linux_graphic_stack.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/x_11.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/x11_demo.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/wayland.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/drm.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/frame_buffer.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/flutter_platform_specific.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/flutter_embeder_elinux.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/flutter_elinux_artifics.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/flutter_elinx_soft_render.svg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/flutter_embeder_linux_softrender.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/elinux_embedding_for_flutter.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/flutter_elunx_fb_flow.svg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/skia_rgba.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/memory_rgba.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/dislplay_apple_banana.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/display_single_buffer.gif">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/display_double_buffer.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/display_jank_double_buffer.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/display_jank_three_buffer.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/flutter_iot/flutter_elinux_plan.svg">
+<meta property="article:published_time" content="2022-07-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2023-04-12T15:10:28.627Z">
+<meta property="article:author" content="lucky_chen">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://lucky-chen.github.io/image/flutter_iot/iot_bussness.PNG">
+
+<link rel="canonical" href="https://lucky-chen.github.io/2022/07/15/flutter/flutter_iot/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Flutter移植嵌入式linux设备、IOT方向探索 | Chen's Notes</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Chen's Notes</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://lucky-chen.github.io/2022/07/15/flutter/flutter_iot/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="lucky_chen">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Chen's Notes">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Flutter移植嵌入式linux设备、IOT方向探索
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-07-15 00:00:00" itemprop="dateCreated datePublished" datetime="2022-07-15T00:00:00+08:00">2022-07-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-04-12 23:10:28" itemprop="dateModified" datetime="2023-04-12T23:10:28+08:00">2023-04-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Flutter/" itemprop="url" rel="index"><span itemprop="name">Flutter</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>iot有着很广阔的场景: <a target="_blank" rel="noopener" href="https://pdf.dfcfw.com/pdf/H3_AP202202071545436398_1.pdf">艾瑞咨询-积基“数”本、重塑产业：中国物联网行业研究报告-220129</a>. 智慧城市、车联网、智慧零售、智能家居、智能工厂. </p>
+ <span id="more"></span>
+
+<p><img src="/image/flutter_iot/iot_bussness.PNG"></p>
+<ul>
+<li>自动售货机</li>
+<li>政府政务办理机器</li>
+<li>医院挂号、缴费、检查报告机 (浙一)</li>
+<li>车载“科技感”大联屏</li>
+</ul>
+<p>越来越方便、随处可见、智能化的设备, 它们的技术方案是什么?<br>flutter这种技术方案,是否能运用在这些场景之中?</p>
+<p>Flutter目前在PC、移动端和web领域站稳跟脚,稳步发展,但是在iot领域, 存在感还不太强.<br><img src="/image/flutter_iot/flutter_tech.svg"></p>
+<h1 id="IOT场景调研"><a href="#IOT场景调研" class="headerlink" title="IOT场景调研"></a>IOT场景调研</h1><h2 id="行业case"><a href="#行业case" class="headerlink" title="行业case"></a>行业case</h2><ul>
+<li>Toyota 车载屏幕<ul>
+<li>技术方案<ul>
+<li>before: 嵌入式linux</li>
+<li>船新版本: Custom Flutter Engine Embedders</li>
+<li><a target="_blank" rel="noopener" href="https://flutter.dev/showcase/toyota">Flutter Showcase | Toyota</a></li>
+</ul>
+</li>
+<li>收益<ul>
+<li>性能</li>
+<li>ui动效体验</li>
+<li>开发体验</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>梅赛德斯奔驰超联屏<ul>
+<li>QT</li>
+</ul>
+</li>
+<li>医疗<ul>
+<li><a target="_blank" rel="noopener" href="https://www.qt.io/zh-cn/qt-in-medical">QT</a></li>
+</ul>
+</li>
+</ul>
+<h2 id="小结-嵌入式-iot-UI框架技术方案"><a href="#小结-嵌入式-iot-UI框架技术方案" class="headerlink" title="小结:嵌入式/iot UI框架技术方案"></a>小结:嵌入式/iot UI框架技术方案</h2><ul>
+<li>嵌入式linux + QT        (传统开发出身)</li>
+<li>性能好点的跑Android (移动互联出身)</li>
+<li>其它 : 天猫精灵 (js 世界) </li>
+</ul>
+<h1 id="Flutter-IOT方向探索"><a href="#Flutter-IOT方向探索" class="headerlink" title="Flutter IOT方向探索"></a>Flutter IOT方向探索</h1><ul>
+<li>前期技术探索阶段</li>
+<li>打卡机实现阶段</li>
+</ul>
+<p><img src="/image/flutter_iot/flutter_iot_explore.jpg"></p>
+<h2 id="技术探索阶段"><a href="#技术探索阶段" class="headerlink" title="技术探索阶段"></a>技术探索阶段</h2><ul>
+<li>Flutter on Android </li>
+<li>Flutter on Linux :<ul>
+<li>PC </li>
+<li>嵌入式</li>
+</ul>
+</li>
+</ul>
+<h3 id="Linux图形栈"><a href="#Linux图形栈" class="headerlink" title="Linux图形栈"></a>Linux图形栈</h3><p>嵌入式和pc在图形栈是什么样子的, 后期如何选择合适的方案?<br>flutter-gtk<br><img src="/image/flutter_iot/flutter_gtk.png"><br>linux_graphic</p>
+<p><img src="/image/flutter_iot/linux_graphic_stack.png"></p>
+<ul>
+<li>GTK: Unix-like系統下开发图形界面的应用程序的主流开发工具之一</li>
+<li>显示服务器(Display Server):<ul>
+<li>X11 : 1984年由MIT研发,历史悠久. Server/Client模型,但是由于通信效率、以及老旧设计问题,逐渐被wayland替代  X Window的前生今世</li>
+<li>Wayland:  揭开Wayland的面纱 Compositor/Client模型。(现代化渲染模型),<br>gtk4将显示后端由x11迁移到wayland,gtk5考虑放弃支持x11</li>
+</ul>
+</li>
+<li>xxGl : opengl库</li>
+<li>Drm: DRM subsystem in Linux直接渲染管理器。</li>
+<li>Framebuffer: fbdev 的 API ，用于管理显卡的 framebuffer (LCD屏幕显示内存映射)</li>
+<li>Evdev: 管理输入设备:鼠标、键盘、触摸屏, 一般通过libinput库监听各种设备转化后的标准事件.</li>
+</ul>
+<h4 id="X-Window-System"><a href="#X-Window-System" class="headerlink" title="X Window System"></a>X Window System</h4><p>X是规范,不是具体的某个软件, 现在大部分的 distribution使用的X都是由 Xorg 基金会所提供的 X11 软件 . 不是UNIX或Linux内核的一部分，而是用户态的软件组件，用户在系统上可以选择启用或禁用X。</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://wizardforcel.gitbooks.io/vbird-linux-basic-4e/content/202.html">X Window System介绍</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/321725817">Linux 图形界面的显示原理是什么</a></li>
+</ul>
+<p>X11采用了client/server的架构，整个图形视窗系统主要分为3个部分： </p>
+<ul>
+<li><code>XClient</code>（X客户端）。X Client也叫X应用程序，负责实现程序逻辑，在收到设备事件后计算出绘图数据，由于本身没有绘制能力，只能向<code>XServer</code>发送绘制请求和绘图，告诉X Server在哪里绘制一个什么样的图形。X Client可以和X Server在同一个主机上，也可以通过TCP/IP网络连接。 (Xlib及其替代者XCB)</li>
+<li><code>XServer</code>（X服务器）。X Server一方面负责和设备驱动交互，监听显示器和键盘鼠标，另一方面响应<code>XClient</code>需求传递键盘、鼠标事件、（通过设备驱动）绘制图形文字等。</li>
+<li>Compositor:(合成器)或者叫Window Manager。多个X Client程序并不知道彼此的存在，需要一个管理者统一协调，即Window Manager，它掌管各X Client的Window（窗口）视觉外观，如形状、排列、移动、重叠渲染等. Window Manager并非X Server的一部分，而是一个特殊的X Client程序。(<code>Metacity、Mutter、KWin、 vtwm、Xfwm、Compiz</code>)</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">XDrawLine</span>(display_, x_window_, x_gc_, <span class="number">0</span>, <span class="number">0</span>, <span class="number">50</span>, <span class="number">50</span>);</span><br></pre></td></tr></table></figure>
+<p><img src="/image/flutter_iot/x_11.png"></p>
+<ul>
+<li>优点:<ul>
+<li>模块化设计, X Client和X Server相互独立，并不需要了解彼此所处的硬件、软件环境。</li>
+<li>90年代初期，gpu还没普及, “X终端机（X terminal）”，专门部署X Server，将远端UNIX主机上的图形界面程序显示出来，这也正是MIT研发X的初衷之一。</li>
+</ul>
+</li>
+<li>缺点:<ul>
+<li>频繁的通信, ui太浪费性能</li>
+<li>Xorg大管家管事太多，除了管理input，所有的绘图请求、窗口管理、窗口合成都必须要与Xorg进行交互，导致Xorg上存在性能瓶颈。根源还在于Xorg的架构太复杂。</li>
+</ul>
+</li>
+</ul>
+<p><img src="/image/flutter_iot/x11_demo.png"></p>
+<h4 id="Wayland"><a href="#Wayland" class="headerlink" title="Wayland"></a>Wayland</h4><p>Wayland是一个新的图形窗口系统方案，一套旨在取代X的新规范。与X最大的不同是，Wayland将X中的Server和窗口管理器整合到一起作为服务端，称为合成器（Compositor），架构上只分了客户端和合成器两大部件.</p>
+<blockquote>
+<p>2008年，红帽公司（RedHat）的开发者Kristian Høgsberg利用业余时间搞起了Wayland项目，2010年Wayland加入了<a target="_blank" rel="noopener" href="http://freedesktop.org项目/">http://Freedesktop.org项目</a></p>
+</blockquote>
+<ul>
+<li>客户端（Wayland Client），直接计算各自界面的渲染缓冲数据，客户端程序需要和渲染库（如OpenGL）链接。 </li>
+<li>合成器（Wayland Compositor），汇总所有客户端的渲染数据，实现各界面窗口“合成”，最后交给显示驱动绘图。 Wayland项目提供了两套底层库libwayland-server和libwayland-client，简化图形程序开发，还给了一个Compositor参考实现——Weston。<br><img src="/image/flutter_iot/wayland.png"></li>
+</ul>
+<h4 id="DRM"><a href="#DRM" class="headerlink" title="DRM"></a>DRM</h4><p>DRM 的诞生就是用来处理多个程序对 Video Card 资源的协同使用问题。DRM 获得对 Video Card 的独占访问权限，它负责初始化和维护命令队列、Video RAM 以及其他相关的硬件资源，要使用 GPU 的程序将请求发送给 DRM，由 DRM 作为仲裁来避免冲突。</p>
+<p><img src="/image/flutter_iot/drm.png"></p>
+<h4 id="FrameBuffer"><a href="#FrameBuffer" class="headerlink" title="FrameBuffer"></a>FrameBuffer</h4><p><a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Linux_framebuffer">https://en.wikipedia.org/wiki/Linux_framebuffer</a></p>
+<p>Linux抽象出FrameBuffer这个设备来供用户态进程实现直接写屏, 可以看成是显示内存的一个映像，将其映射到进程地址空间之后，就可以直接进行读写操作，而写操作可以立即反应在屏幕上。这种操作是抽象的，统一的，用户不必关心物理显存的位置、换页机制等等具体细节，这些都是由Framebuffer设备驱动来完成的，</p>
+<p><img src="/image/flutter_iot/frame_buffer.png"></p>
+<p>到此,对linux底层图形栈有了全面的了解.</p>
+<h3 id="Custom-Flutter-移植"><a href="#Custom-Flutter-移植" class="headerlink" title="Custom Flutter 移植"></a>Custom Flutter 移植</h3><p>官方实现了对linux(gtk)的支持,像ubuntu这类pc系统可以正常run起来. 但是对嵌入式Linux的支持不成熟，ui渲染、库支持、交叉编译工具链、包体积、内存等需要修改定制，sony在官方api的基础上,开源了一个项目,支持flutter 嵌入式.</p>
+<ul>
+<li>官方定制说明 <a target="_blank" rel="noopener" href="https://github.com/flutter/flutter/wiki/Custom-Flutter-Engine-Embedders">Custom Flutter Engine Embedders</a> </li>
+<li>sony开源项目<a target="_blank" rel="noopener" href="https://github.com/sony/flutter-embedded-linux">flutter-embedded-linux</a></li>
+</ul>
+<h4 id="Flutter架构"><a href="#Flutter架构" class="headerlink" title="Flutter架构"></a>Flutter架构</h4><p><img src="/image/flutter_iot/flutter_platform_specific.png"></p>
+<p>平台无关: 跨平台</p>
+<ul>
+<li>dart业务代码</li>
+<li>Flutter framework(Dart)</li>
+<li>Flutter engine </li>
+<li>DartVM</li>
+<li>渲染</li>
+</ul>
+<p><a target="_blank" rel="noopener" href="https://github.com/flutter/engine/blob/main/shell/platform/embedder/embedder.h">embedders接口</a></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="keyword">struct</span> &#123;</span><br><span class="line">  <span class="comment">//启动、销毁、初始化</span></span><br><span class="line">  FlutterEngineRunFnPtr Run;</span><br><span class="line">  FlutterEngineShutdownFnPtr Shutdown;</span><br><span class="line">  FlutterEngineInitializeFnPtr Initialize;</span><br><span class="line">  <span class="comment">//平台发送event事件给flutter</span></span><br><span class="line">  FlutterEngineSendPointerEventFnPtr SendPointerEvent;</span><br><span class="line">  FlutterEngineSendKeyEventFnPtr SendKeyEvent;</span><br><span class="line">  <span class="comment">//PlatformMessage</span></span><br><span class="line">  FlutterEngineSendPlatformMessageFnPtr SendPlatformMessage;</span><br><span class="line">  FlutterEnginePlatformMessageCreateResponseHandleFnPtr</span><br><span class="line">  <span class="comment">//外接纹理</span></span><br><span class="line">  FlutterEngineRegisterExternalTextureFnPtr RegisterExternalTexture;</span><br><span class="line">  <span class="comment">//task</span></span><br><span class="line">  FlutterEnginePostRenderThreadTaskFnPtr PostRenderThreadTask;</span><br><span class="line">  <span class="comment">//...</span></span><br><span class="line">&#125; FlutterEngineProcTable;</span><br></pre></td></tr></table></figure>
+
+<p>特定平台代码 (移植工作)</p>
+<ul>
+<li>渲染支持 (显示后端)</li>
+<li>Event (输入设备事件)</li>
+<li>扩展能力(Plugin、外接纹理)</li>
+<li>生命周期管理(engine/window/view)</li>
+</ul>
+<h4 id="Sony开源项目"><a href="#Sony开源项目" class="headerlink" title="Sony开源项目"></a>Sony开源项目</h4><p><img src="/image/flutter_iot/flutter_embeder_elinux.png"></p>
+<ul>
+<li>lifecycle</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">FlutterELinuxEngine::<span class="built_in">RunWithEntrypoint</span>(...)&#123;</span><br><span class="line">    embedder_api_.<span class="built_in">Run</span>(&amp;renderer_config, ...);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">FlutterELinuxEngine::Stop</span><span class="params">()</span> </span>&#123;</span><br><span class="line">     embedder_api_.<span class="built_in">Shutdown</span>(engine_);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>event</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">FlutterELinuxEngine::SendPointerEvent</span><span class="params">(...)</span> </span>&#123;</span><br><span class="line">   embedder_api_.<span class="built_in">SendPointerEvent</span>(engine_, &amp;event, <span class="number">1</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>plugin/Texture</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">FlutterELinuxEngine::SendPlatformMessage</span><span class="params">()</span></span>&#123;</span><br><span class="line">    embedder_api_.<span class="built_in">PlatformMessageCreateResponseHandle</span>(...);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">FlutterELinuxEngine::RegisterExternalTexture</span><span class="params">(<span class="type">int64_t</span> texture_id)</span> </span>&#123;</span><br><span class="line">  embedder_api_.<span class="built_in">RegisterExternalTexture</span>(engine_, texture_id);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>render</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">FlutterELinuxEngine::<span class="built_in">RunWithEntrypoint</span>(...)&#123;</span><br><span class="line">    <span class="keyword">auto</span> renderer_config = <span class="built_in">GetRendererConfig</span>();</span><br><span class="line">    embedder_api_.<span class="built_in">Run</span>(&amp;renderer_config, ...);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li>完成对flutter实例的管理, 启动销毁、渲染更新、事件发送、平台插件能力提供.</li>
+<li>在具体渲染上屏的时候，选择对应的display backend(wayland、x11、gbm、egl)<br>产物</li>
+</ol>
+<p><img src="/image/flutter_iot/flutter_elinux_artifics.png"></p>
+<h2 id="技术实现"><a href="#技术实现" class="headerlink" title="技术实现"></a>技术实现</h2><ul>
+<li>技术需求:<ul>
+<li> flutter嵌入式linux支持</li>
+</ul>
+</li>
+<li>业务场景:嵌入式linux<ul>
+<li>软件开发技术诉求<ul>
+<li>当前qt方案, 大量c++代码(驱动、视频库), 未来可能切换到Android设备</li>
+<li>希望一套代码跨端(ui+逻辑)</li>
+</ul>
+</li>
+<li>硬件孱弱, 运行性能要求<ul>
+<li>4核 or 1核</li>
+<li>512m内存</li>
+<li>没有gpu</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>问题<ul>
+<li>开发版型号未定,硬件性能不确定</li>
+<li>不确定是哪种渲染方式 Gtk ? x11 ? wayland? </li>
+<li>确定没有gpu, 必须实现软解方案</li>
+</ul>
+</li>
+</ul>
+<h3 id="第一步-mock环境-预先获得数据"><a href="#第一步-mock环境-预先获得数据" class="headerlink" title="第一步 mock环境,预先获得数据"></a>第一步 mock环境,预先获得数据</h3><h4 id="摸清楚当前硬解方案的性能x11-wayland-drm"><a href="#摸清楚当前硬解方案的性能x11-wayland-drm" class="headerlink" title="摸清楚当前硬解方案的性能x11 wayland  drm"></a>摸清楚当前硬解方案的性能x11 wayland  drm</h4><p>硬件:</p>
+<ul>
+<li>树莓派2w </li>
+<li>480x640<br>数据:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">fps</th>
+<th align="left">内存</th>
+<th align="left">cpu (core 4)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">x11</td>
+<td align="left">30</td>
+<td align="left">flutter-45% xorg-5%</td>
+<td align="left">300%</td>
+</tr>
+<tr>
+<td align="left">wayland</td>
+<td align="left">:—</td>
+<td align="left">35.1%</td>
+<td align="left">5%</td>
+</tr>
+<tr>
+<td align="left">drm</td>
+<td align="left">50-60</td>
+<td align="left">:–</td>
+<td align="left">:–</td>
+</tr>
+</tbody></table>
+<ul>
+<li>x11数据太差</li>
+<li>wayland数据像是bug( 可能是使用姿势问题)</li>
+<li>drm数据超出预期<br>x11/wayland 是多app窗口形式, drm是独占屏幕模式</li>
+</ul>
+<h4 id="适配x11和wayland-软解的成本"><a href="#适配x11和wayland-软解的成本" class="headerlink" title="适配x11和wayland 软解的成本"></a>适配x11和wayland 软解的成本</h4><p>skia自身支持软解, 去熟悉flutter、elinux-flutter、以及图形api(x11/wayland), 写代码串联run起来.<br><img src="/image/flutter_iot/flutter_elinx_soft_render.svg"></p>
+<ul>
+<li>FLUTTER 源码,flutter通过skia 软解获取纹理数据</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">/skia申请<span class="function">bacbuffer</span></span><br><span class="line"><span class="function">sk_sp&lt;SkSurface&gt; <span class="title">EmbedderSurfaceSoftware::AcquireBackingStore</span><span class="params">()</span></span>&#123;</span><br><span class="line">  SkImageInfo info =SkImageInfo::<span class="built_in">Make</span>(...);</span><br><span class="line">  sk_surface_ = SkSurface::<span class="built_in">MakeRaster</span>(info, <span class="literal">nullptr</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">EmbedderSurfaceSoftware::PresentBackingStore</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="comment">//消费buffer 纹理数据</span></span><br><span class="line">    backing_store-&gt;<span class="built_in">peekPixels</span>(&amp;pixmap)</span><br><span class="line">    <span class="comment">//通过embderapi透传出去</span></span><br><span class="line">    software_dispatch_table_.<span class="built_in">software_present_backing_store</span>(</span><br><span class="line">      pixmap.<span class="built_in">addr</span>(),      <span class="comment">//</span></span><br><span class="line">      pixmap.<span class="built_in">rowBytes</span>(),  <span class="comment">//</span></span><br><span class="line">      pixmap.<span class="built_in">height</span>()     <span class="comment">//</span></span><br><span class="line">  );</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>elinux-flutter调用embderapi, 注册渲染数据回调</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//软件解码,传过来skia解码后的bitmap</span></span><br><span class="line"><span class="function">FlutterRendererConfig <span class="title">GetSoftwareRendererConfig</span><span class="params">()</span></span>&#123;</span><br><span class="line">  FlutterRendererConfig config = &#123;&#125;;</span><br><span class="line">  config.type = kSoftware;</span><br><span class="line">  config.software.surface_present_callback = [](...) &#123;</span><br><span class="line">    host-&gt;<span class="built_in">view</span>()-&gt;<span class="built_in">PresentSoftwareBitmap</span>(allocation,row_bytes,height);</span><br><span class="line">  &#125;;</span><br><span class="line">  <span class="keyword">return</span> config;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//通过xlib上屏纹理数据 (wayland类似)</span></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">ELinuxWindowX11::OnBitmapSurfaceUpdated</span><span class="params">(...)</span></span>&#123;</span><br><span class="line">  <span class="comment">//...</span></span><br><span class="line">  <span class="keyword">auto</span> img = <span class="built_in">XCreateImage</span>(display_,x_visual_,deps,ZPixmap,<span class="number">0</span>,data,width,height,<span class="number">32</span>,<span class="number">0</span>);</span><br><span class="line">  <span class="built_in">XPutImage</span>(display_,x_window_,x_gc_,img,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,width,height);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">//硬件解码,走opengl</span></span><br><span class="line"><span class="function">FlutterRendererConfig <span class="title">GetRendererConfig</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    FlutterRendererConfig config = &#123;&#125;;</span><br><span class="line">    config.type = kOpenGL;</span><br><span class="line">    config.open_gl.make_current =  [](...) -&gt; <span class="type">bool</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> host-&gt;<span class="built_in">view</span>()-&gt;<span class="built_in">MakeCurrent</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="keyword">struct</span> &#123;</span><br><span class="line">  <span class="type">size_t</span> struct_size;</span><br><span class="line">  BoolCallback make_current;</span><br><span class="line">  BoolCallback clear_current;</span><br><span class="line">  BoolCallback present;</span><br><span class="line">  UIntCallback fbo_callback;</span><br><span class="line">  BoolCallback make_resource_current;</span><br><span class="line">  <span class="type">bool</span> fbo_reset_after_present;</span><br><span class="line">  TransformationCallback surface_transformation;</span><br><span class="line">  ProcResolver gl_proc_resolver;</span><br><span class="line">  TextureFrameCallback gl_external_texture_frame_callback;</span><br><span class="line">  UIntFrameInfoCallback fbo_with_frame_info_callback;</span><br><span class="line">&#125; FlutterOpenGLRendererConfig;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>实现了x11/wayland下的软件解码成本不大, 但是最终没有采用这个方式</p>
+<ul>
+<li>在实现X11和wayland的软件解码的同时,同时验证的硬件解码的性能数据不太理想: x11 fps 20左右, wayland卡成ppt</li>
+<li>沟通了合作方的技术方案<ul>
+<li>app是全屏独占模式,x11和wayland是窗口模式</li>
+<li>走的是定制化framebuffer, 不走x11 or wayland </li>
+</ul>
+</li>
+<li>继续研究fb下的实现</li>
+</ul>
+<h3 id="第二步-正式开发FB"><a href="#第二步-正式开发FB" class="headerlink" title="第二步 正式开发FB"></a>第二步 正式开发FB</h3><p>根据业务的硬件和软件情况: 没有GPU,定制显示到framebuffer上. 确定做flutter在嵌入式上直接显示到framebuffer的方案</p>
+<p><img src="/image/flutter_iot/flutter_embeder_linux_softrender.png"></p>
+<ul>
+<li>渲染framebuffer</li>
+<li>事件-evdev</li>
+</ul>
+<h4 id="Framebuffer开发介绍"><a href="#Framebuffer开发介绍" class="headerlink" title="Framebuffer开发介绍"></a>Framebuffer开发介绍</h4><p><img src="/image/flutter_iot/elinux_embedding_for_flutter.png"></p>
+<ul>
+<li>红色为Flutter-elinux运行时扩展framebuffer的核心链路代码</li>
+<li>蓝色是和flutter embder交互的接口</li>
+<li>橘色为使用linux本地能力的代码 (渲染+event)</li>
+</ul>
+<p><img src="/image/flutter_iot/flutter_elunx_fb_flow.svg"></p>
+<ul>
+<li>创建对应渲染后端对应的窗口</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"> std::unique_ptr&lt;flutter::WindowBindingHandler&gt; window_wrapper =</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">if</span> defined(DISPLAY_BACKEND_TYPE_DRM_GBM)</span></span><br><span class="line">      std::make_unique&lt;flutter::ELinuxWindowDrm&lt;flutter::NativeWindowDrmGbm&gt;&gt;(</span><br><span class="line">          view_properties);</span><br><span class="line">          </span><br><span class="line"><span class="meta">#<span class="keyword">elif</span> defined(DISPLAY_BACKEND_TYPE_DRM_EGLSTREAM)</span></span><br><span class="line">      std::make_unique&lt;</span><br><span class="line">          flutter::ELinuxWindowDrm&lt;flutter::NativeWindowDrmEglstream&gt;&gt;(</span><br><span class="line">          view_properties);</span><br><span class="line">          </span><br><span class="line"><span class="meta">#<span class="keyword">elif</span> defined(DISPLAY_BACKEND_TYPE_X11)</span></span><br><span class="line">      std::<span class="built_in">make_unique</span>&lt;flutter::ELinuxWindowX11&gt;(view_properties);</span><br><span class="line">      </span><br><span class="line"><span class="meta">#<span class="keyword">elif</span> defined(DISPLAY_BACKEND_TYPE_WAYLAND)</span></span><br><span class="line">      std::<span class="built_in">make_unique</span>&lt;flutter::ELinuxWindowWayland&gt;(view_properties);</span><br><span class="line">      </span><br><span class="line"><span class="meta">#<span class="keyword">elif</span> defined(DISPLAY_BACKEND_TYPE_FRAME_BUFFER)</span></span><br><span class="line">      std::<span class="built_in">make_unique</span>&lt;flutter::ELinuxWindowFrameBuffer&gt;(view_properties);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>核心逻辑</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">NativeWindowFrameBuffer::<span class="built_in">NativeWindowFrameBuffer</span>(...) &#123;</span><br><span class="line">    <span class="comment">//打开fb设备文件</span></span><br><span class="line">    m_fbfd_ = <span class="built_in">open</span>(<span class="string">&quot;/dev/fb0&quot;</span>, O_RDWR);</span><br><span class="line">    <span class="comment">//获取fb屏幕信息</span></span><br><span class="line">    <span class="built_in">ioctl</span>(m_fbfd_, FBIOGET_VSCREENINFO, &amp;m_vinfo_);</span><br><span class="line">    <span class="comment">//映射内存</span></span><br><span class="line">    fb_base = (<span class="type">unsigned</span> <span class="type">char</span>*)<span class="built_in">mmap</span>(<span class="number">0</span>, screen_size * <span class="number">2</span>, PROT_READ | PROT_WRITE,</span><br><span class="line">                                   MAP_SHARED, m_fbfd_, <span class="number">0</span>); </span><br><span class="line">    <span class="comment">//获取支持的lcd格式: rgba8888...                               </span></span><br><span class="line">     rgb = <span class="built_in">findFormat</span>();</span><br><span class="line">    <span class="comment">//设置tty为KD_GRAPHICS模式,防止终端刷新,导致画面闪烁</span></span><br><span class="line">    <span class="built_in">openDev</span>()                                                                                         </span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//软解纹理数据更新</span></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">NativeWindowFrameBuffer::OnBitmapSurfaceUpdated</span><span class="params">(...)</span></span>&#123;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">    <span class="built_in">lcd_draw</span>(fb_base,data);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//事件处理 监听linux的libinput库</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">ELinuxWindowFrameBuffer::OninputEvent</span><span class="params">(...)</span> </span>&#123;</span><br><span class="line">  <span class="keyword">switch</span> (event_type) &#123;</span><br><span class="line">      <span class="keyword">case</span> LIBINPUT_EVENT_KEYBOARD_KEY:</span><br><span class="line">       <span class="comment">//转换event后,通过embederapi发给flutter</span></span><br><span class="line">        <span class="built_in">OnKeyEvent</span>(event);</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      <span class="keyword">case</span> LIBINPUT_EVENT_TOUCH_DOWN:</span><br><span class="line">        <span class="built_in">OnTouchDown</span>(event); </span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      <span class="keyword">default</span>:</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<h5 id="问题1-处理纹理数据到framebuffer时间过长"><a href="#问题1-处理纹理数据到framebuffer时间过长" class="headerlink" title="问题1  处理纹理数据到framebuffer时间过长"></a>问题1  处理纹理数据到framebuffer时间过长</h5><p>OnBitmapSurfaceUpdated 函数耗时过长, 40-50ms左右 1000/50 = 20 fps?</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">NativeWindowFrameBuffer::OnBitmapSurfaceUpdated</span><span class="params">(...)</span></span>&#123;</span><br><span class="line">    <span class="comment">//START</span></span><br><span class="line">    <span class="keyword">for</span> (x = <span class="number">0</span>; x &lt; m_vinfo_.xres; x++)&#123;</span><br><span class="line">        <span class="keyword">for</span> (y = <span class="number">0</span>; y &lt; m_vinfo_.yres; y++)&#123;</span><br><span class="line">          <span class="comment">//rgba8888-&gt;rgb565</span></span><br><span class="line">          <span class="built_in">lcd_put_pixel</span>(fb_base, x, y, allocation);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//END</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>纹理数据的像素格式转换为fb驱动支持的格式: rgba8888-&gt;rgb565</li>
+<li>cpu浪费: <ul>
+<li>flutter调用skia时, 软解默认写死是rgba8888格式,lcd 不一定需要这么高规格: rgb565, skia调用cpu绘制、纹理化数据的操作,浪费性能</li>
+<li>Framebuffer 消费 数据时,额外对每个像素做一次格式降级,cpu浪费+1. rgba8888-&gt;rgb565</li>
+</ul>
+</li>
+<li>内存浪费<ul>
+<li>rgb565(16位),rgba8888 32位. 2倍内存</li>
+</ul>
+</li>
+</ul>
+<p>解决方法: </p>
+<ul>
+<li>预先获得格式,让skia按传入格式处理, </li>
+<li>framebuffer消费时直接memcpy就完了</li>
+</ul>
+<p><img src="/image/flutter_iot/skia_rgba.png"></p>
+<ul>
+<li>cp纹理数据到buffer</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">NativeWindowFrameBuffer::OnBitmapSurfaceUpdated</span><span class="params">(..data)</span></span>&#123;</span><br><span class="line">  <span class="comment">//... check</span></span><br><span class="line">  <span class="built_in">memcpy</span>(fb_base_void, data, <span class="built_in">sizeof</span>(<span class="type">char</span>) * m_vinfo_.xres * m_vinfo_.yres * <span class="number">2</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>framebuffer消费数据耗时 50ms-&gt;4.1ms</li>
+<li>纹理内存减半 pixmap_data_size : 4m -&gt; 2m</li>
+</ul>
+<p><img src="/image/flutter_iot/memory_rgba.png"></p>
+<h4 id="问题2-画面撕裂"><a href="#问题2-画面撕裂" class="headerlink" title="问题2: 画面撕裂"></a>问题2: 画面撕裂</h4><ul>
+<li>上半部分苹果,下半部分香蕉</li>
+</ul>
+<p><img src="/image/flutter_iot/dislplay_apple_banana.png"></p>
+<ul>
+<li>单缓冲 (1080p屏幕比较明显)</li>
+</ul>
+<p><img src="/image/flutter_iot/display_single_buffer.gif"></p>
+<ul>
+<li>双缓冲</li>
+</ul>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">NativeWindowFrameBuffer::SwapBuffers</span><span class="params">()</span> </span>&#123;</span><br><span class="line">   <span class="comment">//切换buffer</span></span><br><span class="line">   m_vinfo_.yoffset = m_buffer_index_ * m_vinfo_.yres;</span><br><span class="line">   <span class="comment">//显示buffer内容</span></span><br><span class="line">   <span class="built_in">ioctl</span>(m_fbfd_, FBIOPAN_DISPLAY, &amp;m_vinfo_);</span><br><span class="line">   m_buffer_index_ = (m_buffer_index_ + <span class="number">1</span>) % <span class="number">2</span>;</span><br><span class="line">   m_backbuffer = m_framebuffer + m_buffer_index_ * m_page_size_;</span><br><span class="line">   <span class="comment">//vsync</span></span><br><span class="line">   <span class="built_in">ioctl</span>(m_fbfd_, FBIO_WAITFORVSYNC, &amp;dummy);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>前台buffer展示, 后台buffer写数据. 轮流切换</p>
+<p><img src="/image/flutter_iot/display_double_buffer.png"></p>
+<ul>
+<li>三缓冲: Android  4.1黄油计划(Project Butter)</li>
+</ul>
+<p>目前实现到双缓冲,3缓冲还未支持 <a target="_blank" rel="noopener" href="https://github.com/huanzhiyazi/articles/issues/28">Android显示系统之——多缓冲和Vsync</a></p>
+<ul>
+<li>cpu等待一个vsync(16ms),浪费</li>
+</ul>
+<p><img src="/image/flutter_iot/display_jank_double_buffer.png"></p>
+<ul>
+<li>没有什么是buffer解决不了的,如果不够,那就再加1个!</li>
+</ul>
+<p><img src="/image/flutter_iot/display_jank_three_buffer.png"></p>
+<h3 id="数据汇总"><a href="#数据汇总" class="headerlink" title="数据汇总"></a>数据汇总</h3><table>
+<thead>
+<tr>
+<th align="left">树莓派数据</th>
+<th align="left">CPU占用%</th>
+<th align="left">内存占用%(512)</th>
+<th align="left">fps</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">静止</td>
+<td align="left">99.77</td>
+<td align="left">7.94</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">滑动</td>
+<td align="left">126</td>
+<td align="left"></td>
+<td align="left">50-60, 转场20-30</td>
+</tr>
+</tbody></table>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><h2 id="目前方案情况"><a href="#目前方案情况" class="headerlink" title="目前方案情况"></a>目前方案情况</h2><ul>
+<li>Core : 核心链路功能完善, 需要做性能优化</li>
+<li>Cli:      将arm64交叉编译构建能力合入</li>
+<li>Deps: 空白. 相关嵌入式上的生态能力补充. widgets、plugin、动态化</li>
+</ul>
+<p><img src="/image/flutter_iot/flutter_elinux_plan.svg"></p>
+<p>在扩展flutter-elinux项目后, 目前flutter针对复杂的linux终端设备类型, 不管从硬件类型还是软件方案,基本可以做到全覆盖:</p>
+<ul>
+<li>官方:  linux pc发行版完全体  gtk</li>
+<li>嵌入式: <ul>
+<li>硬解 opengl &amp;&amp; 软解skia</li>
+<li>显示后端: <ul>
+<li>轻量版 :        窗口模式.        x11、wayland </li>
+<li>究极精简版:  全屏独占模式 DRM、Framebuffer</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="场景探索"><a href="#场景探索" class="headerlink" title="场景探索"></a>场景探索</h2><p>也就是说,从技术上来说, iot、嵌入式设备上gui方案, flutter在技术上是完全支持,不存在技术障碍,有场景基本可以拎包就上.<br>和QT目前的状态有点相似, QT作为老牌方案,目前应用已经非常广泛, 见官方宣传图,涉及多个领域和设备类型.<br>[图片]<br>既然QT能做,能力相似的Flutter也能做. 并且相比于QT,Fluter有着天然的跨端能力(一套dart代码跨n个端), 更简单的开发语言(dart vs c++), 这是QT无法比拟的. Flutter Linux 调研<br>类似领域/场景,Why Not Try Flutter?</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/05/25/flutter/tools_androidx/" rel="prev" title="FlutterEngine AndroidX/Support适配">
+      <i class="fa fa-chevron-left"></i> FlutterEngine AndroidX/Support适配
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/12/25/compose/compiler_1/" rel="next" title="Compose Compiler(1) kotlin编译架构&&KCP">
+      Compose Compiler(1) kotlin编译架构&&KCP <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#IOT%E5%9C%BA%E6%99%AF%E8%B0%83%E7%A0%94"><span class="nav-number">2.</span> <span class="nav-text">IOT场景调研</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A1%8C%E4%B8%9Acase"><span class="nav-number">2.1.</span> <span class="nav-text">行业case</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93-%E5%B5%8C%E5%85%A5%E5%BC%8F-iot-UI%E6%A1%86%E6%9E%B6%E6%8A%80%E6%9C%AF%E6%96%B9%E6%A1%88"><span class="nav-number">2.2.</span> <span class="nav-text">小结:嵌入式&#x2F;iot UI框架技术方案</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Flutter-IOT%E6%96%B9%E5%90%91%E6%8E%A2%E7%B4%A2"><span class="nav-number">3.</span> <span class="nav-text">Flutter IOT方向探索</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8A%80%E6%9C%AF%E6%8E%A2%E7%B4%A2%E9%98%B6%E6%AE%B5"><span class="nav-number">3.1.</span> <span class="nav-text">技术探索阶段</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Linux%E5%9B%BE%E5%BD%A2%E6%A0%88"><span class="nav-number">3.1.1.</span> <span class="nav-text">Linux图形栈</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#X-Window-System"><span class="nav-number">3.1.1.1.</span> <span class="nav-text">X Window System</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Wayland"><span class="nav-number">3.1.1.2.</span> <span class="nav-text">Wayland</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#DRM"><span class="nav-number">3.1.1.3.</span> <span class="nav-text">DRM</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#FrameBuffer"><span class="nav-number">3.1.1.4.</span> <span class="nav-text">FrameBuffer</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Custom-Flutter-%E7%A7%BB%E6%A4%8D"><span class="nav-number">3.1.2.</span> <span class="nav-text">Custom Flutter 移植</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Flutter%E6%9E%B6%E6%9E%84"><span class="nav-number">3.1.2.1.</span> <span class="nav-text">Flutter架构</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Sony%E5%BC%80%E6%BA%90%E9%A1%B9%E7%9B%AE"><span class="nav-number">3.1.2.2.</span> <span class="nav-text">Sony开源项目</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8A%80%E6%9C%AF%E5%AE%9E%E7%8E%B0"><span class="nav-number">3.2.</span> <span class="nav-text">技术实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5-mock%E7%8E%AF%E5%A2%83-%E9%A2%84%E5%85%88%E8%8E%B7%E5%BE%97%E6%95%B0%E6%8D%AE"><span class="nav-number">3.2.1.</span> <span class="nav-text">第一步 mock环境,预先获得数据</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%91%B8%E6%B8%85%E6%A5%9A%E5%BD%93%E5%89%8D%E7%A1%AC%E8%A7%A3%E6%96%B9%E6%A1%88%E7%9A%84%E6%80%A7%E8%83%BDx11-wayland-drm"><span class="nav-number">3.2.1.1.</span> <span class="nav-text">摸清楚当前硬解方案的性能x11 wayland  drm</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%80%82%E9%85%8Dx11%E5%92%8Cwayland-%E8%BD%AF%E8%A7%A3%E7%9A%84%E6%88%90%E6%9C%AC"><span class="nav-number">3.2.1.2.</span> <span class="nav-text">适配x11和wayland 软解的成本</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5-%E6%AD%A3%E5%BC%8F%E5%BC%80%E5%8F%91FB"><span class="nav-number">3.2.2.</span> <span class="nav-text">第二步 正式开发FB</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Framebuffer%E5%BC%80%E5%8F%91%E4%BB%8B%E7%BB%8D"><span class="nav-number">3.2.2.1.</span> <span class="nav-text">Framebuffer开发介绍</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E9%97%AE%E9%A2%981-%E5%A4%84%E7%90%86%E7%BA%B9%E7%90%86%E6%95%B0%E6%8D%AE%E5%88%B0framebuffer%E6%97%B6%E9%97%B4%E8%BF%87%E9%95%BF"><span class="nav-number">3.2.2.1.1.</span> <span class="nav-text">问题1  处理纹理数据到framebuffer时间过长</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%97%AE%E9%A2%982-%E7%94%BB%E9%9D%A2%E6%92%95%E8%A3%82"><span class="nav-number">3.2.2.2.</span> <span class="nav-text">问题2: 画面撕裂</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%B1%87%E6%80%BB"><span class="nav-number">3.2.3.</span> <span class="nav-text">数据汇总</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%AE%E5%89%8D%E6%96%B9%E6%A1%88%E6%83%85%E5%86%B5"><span class="nav-number">4.1.</span> <span class="nav-text">目前方案情况</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9C%BA%E6%99%AF%E6%8E%A2%E7%B4%A2"><span class="nav-number">4.2.</span> <span class="nav-text">场景探索</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="lucky_chen"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">lucky_chen</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">30</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/lucky-chen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;lucky-chen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="/qh438406812@gmail.com" title="E-Mail → qh438406812@gmail.com"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">lucky_chen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
