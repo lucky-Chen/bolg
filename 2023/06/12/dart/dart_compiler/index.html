@@ -20,15 +20,28 @@
     var CONFIG = {"hostname":"lucky-chen.github.io","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta property="og:type" content="article">
+  <meta name="description" content="概览 了解编译原理,对现代编译器compiler设计有所了解 介绍dart编译器设计, 工程实践上如何设计和实现 了解dart编译器核心代码流转: 核心代码、主要优化">
+<meta property="og:type" content="article">
 <meta property="og:title" content="Dart编译器概述">
 <meta property="og:url" content="https://lucky-chen.github.io/2023/06/12/dart/dart_compiler/index.html">
 <meta property="og:site_name" content="Chen&#39;s Notes">
+<meta property="og:description" content="概览 了解编译原理,对现代编译器compiler设计有所了解 介绍dart编译器设计, 工程实践上如何设计和实现 了解dart编译器核心代码流转: 核心代码、主要优化">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_guide.png">
+<meta property="og:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_guide_cfe.jpg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_ast_tree.jpg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_dill.jpg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_guide_cbe.jpg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_kernel_load.jpg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_il.jpg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_code_instruction.jpg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_cbe_serialize_code.jpg">
+<meta property="og:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_serialize.jpg">
 <meta property="article:published_time" content="2023-06-11T16:00:00.000Z">
-<meta property="article:modified_time" content="2023-06-26T15:25:10.101Z">
+<meta property="article:modified_time" content="2023-06-27T16:37:12.867Z">
 <meta property="article:author" content="lucky_chen">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://lucky-chen.github.io/image/dart/dart_compiler_guide.png">
 
 <link rel="canonical" href="https://lucky-chen.github.io/2023/06/12/dart/dart_compiler/">
 
@@ -188,7 +201,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-06-26 23:25:10" itemprop="dateModified" datetime="2023-06-26T23:25:10+08:00">2023-06-26</time>
+                <time title="修改时间：2023-06-28 00:37:12" itemprop="dateModified" datetime="2023-06-28T00:37:12+08:00">2023-06-28</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -219,7 +232,246 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        
+        <h1 id="概览"><a href="#概览" class="headerlink" title="概览"></a>概览</h1><ul>
+<li>了解编译原理,对现代编译器compiler设计有所了解</li>
+<li>介绍dart编译器设计, 工程实践上如何设计和实现</li>
+<li>了解dart编译器核心代码流转: 核心代码、主要优化</li>
+</ul>
+<span id="more"></span>
+
+<h1 id="Dart编译器架构设计"><a href="#Dart编译器架构设计" class="headerlink" title="Dart编译器架构设计"></a>Dart编译器架构设计</h1><p>现代编译器基本分成两个部分</p>
+<ul>
+<li>Frontend（编译器前端）：对源代码分析得到 AST （抽象语法树）以及符号表，并完成静态检查</li>
+<li>Backend（编译器后端）：基于 AST/IR等前端产物，生成平台目标代码</li>
+</ul>
+<h2 id="编译架构"><a href="#编译架构" class="headerlink" title="编译架构"></a>编译架构</h2><p>在dart中,这两部分具体工作:</p>
+<ol>
+<li>cfe前端编译: dart代码输入, 通过词法、语法分析,构建一颗ast(compoent)树,在经过一系列的优化(treeshake、tfa、Desugaring),将优化后的ast树二进制写入到dill文件中</li>
+<li>后端编译链路: dill作为输入,重建ast树,再将ast树转化为中间FlowGraph, 经过FlowGraph中一系列的平台无关优化,根据编译目标生成JIT或者机器码</li>
+</ol>
+<p><img src="/image/dart/dart_compiler_guide.png"></p>
+<h2 id="编译模式"><a href="#编译模式" class="headerlink" title="编译模式:"></a>编译模式:</h2><ul>
+<li>__JIT 模式__：  !defined(DART_PRECOMPILED_RUNTIME)</li>
+<li>__AOT 模式__：defined(DART_PRECOMPILED_RUNTIME)</li>
+<li><strong>模拟器模式</strong>:  USING_SIMULATOR, Dart 虚拟机将以 CPU 模拟器的方式工作，逐条执行 JIT 编译出来的机器指令。</li>
+</ul>
+<h2 id="编译产物"><a href="#编译产物" class="headerlink" title="编译产物"></a>编译产物</h2><ul>
+<li><strong>snapshot</strong>: 适用 Dart 编译器和 Flutter Tools （JIT 或 Kernel）</li>
+<li><strong>elf</strong>: 适用 Android AOT</li>
+<li><strong>assembly</strong>: 适用 iOS AOT</li>
+</ul>
+<h1 id="前端编译链路CFE"><a href="#前端编译链路CFE" class="headerlink" title="前端编译链路CFE"></a>前端编译链路CFE</h1><p><img src="/image/dart/dart_compiler_guide_cfe.jpg"></p>
+<p>简化流程代码</p>
+<figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//pkg/frontend_server/lib/frontend_server.dart</span></span><br><span class="line">Future&lt;<span class="built_in">bool</span>&gt; compile()&#123;</span><br><span class="line"> <span class="comment">//1.kernelForProgram(source) 源码编译为ast树</span></span><br><span class="line"> <span class="comment">//语法、词法分析、构建astoutinle</span></span><br><span class="line"> summaryComponent = <span class="keyword">await</span> kernelTarget.buildOutlines(...);</span><br><span class="line"> <span class="comment">//构建完整ast树</span></span><br><span class="line"> component = <span class="keyword">await</span> kernelTarget.buildComponent(...);</span><br><span class="line"></span><br><span class="line"> <span class="comment">//2.运行优化transformer: 语法糖去糖、tfa、treeshaking</span></span><br><span class="line"> res = <span class="keyword">await</span> runGlobalTransformations(component)</span><br><span class="line"> </span><br><span class="line"> <span class="comment">//3. 序列化为二进制</span></span><br><span class="line"> <span class="keyword">await</span> writeDillFile(res)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li>根据输入文件,进行词法、语法分析</li>
+<li>构建ast树: 第一次构建ast主题元素, 第二次构建完整ast</li>
+<li>运行各种优化:语法糖脱糖(eg async) 、 CFE 阶段最重要的2个优化 Tree-shaking和tfa</li>
+<li>将优化后的ast树二进制写入dill文件中</li>
+</ol>
+<h2 id="词法分析"><a href="#词法分析" class="headerlink" title="词法分析"></a>词法分析</h2><figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">int</span> Add(<span class="built_in">int</span> a, <span class="built_in">int</span> b) &#123;</span><br><span class="line">  <span class="keyword">return</span> a+b; </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>分词产生token, 源码位置<code>pkg/_fe_analyzer_shared/lib/src/scanner</code></p>
+<figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">int</span>       offset:<span class="number">0</span>, <span class="keyword">false</span></span><br><span class="line">Add       offset:<span class="number">4</span>, <span class="keyword">false</span></span><br><span class="line">(         offset:<span class="number">7</span>, <span class="keyword">false</span></span><br><span class="line"><span class="built_in">int</span>       offset:<span class="number">8</span>, <span class="keyword">false</span></span><br><span class="line">a         offset:<span class="number">12</span>, <span class="keyword">false</span></span><br><span class="line">,         offset:<span class="number">13</span>, <span class="keyword">false</span></span><br><span class="line"><span class="built_in">int</span>       offset:<span class="number">15</span>, <span class="keyword">false</span></span><br><span class="line">b         offset:<span class="number">19</span>, <span class="keyword">false</span></span><br><span class="line">)         offset:<span class="number">20</span>, <span class="keyword">false</span></span><br><span class="line">&#123;         offset:<span class="number">22</span>, <span class="keyword">false</span></span><br><span class="line"><span class="keyword">return</span>    offset:<span class="number">24</span>, <span class="keyword">true</span></span><br><span class="line">a         offset:<span class="number">31</span>, <span class="keyword">false</span></span><br><span class="line">+         offset:<span class="number">32</span>, <span class="keyword">false</span></span><br><span class="line">b         offset:<span class="number">33</span>, <span class="keyword">false</span></span><br><span class="line">;         offset:<span class="number">34</span>, <span class="keyword">false</span></span><br><span class="line">&#125;  </span><br></pre></td></tr></table></figure>
+
+<h2 id="语法分析"><a href="#语法分析" class="headerlink" title="语法分析"></a>语法分析</h2><p>语法分析结果输出. 源码<code>pkg/_fe_analyzer_shared/lib/src/parser</code></p>
+<figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Procedures: [Add, main]</span><br><span class="line">main = test::main;</span><br><span class="line"><span class="keyword">library</span> from <span class="string">&quot;file:///.../test.dart&quot;</span> <span class="keyword">as</span> test &#123;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">static</span> method Add(core::<span class="built_in">int</span> a, core::<span class="built_in">int</span> b) → core::<span class="built_in">int</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> a.&#123;core::<span class="built_in">num</span>::+&#125;(b)&#123;(core::<span class="built_in">num</span>) → core::<span class="built_in">int</span>&#125;;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="AST树构建"><a href="#AST树构建" class="headerlink" title="AST树构建"></a>AST树构建</h2><ol>
+<li>构建ast outine, 构建顶层元素: lib、class、filed、 函数体(procedure)节点本身(函数内容不处理)</li>
+<li>完整ast构建: 处理函数体procedure内容, 即函数内部逻辑的ast<br>ast树的结构如下</li>
+</ol>
+<p><img src="/image/dart/dart_compiler_ast_tree.jpg"></p>
+<h2 id="前端编译优化"><a href="#前端编译优化" class="headerlink" title="前端编译优化"></a>前端编译优化</h2><p>在<code>pkg/kernel/lib/transformations/</code>下有各种优化,<code>runCompiler </code>函数传入 <code>--aot</code> 选项开启这些优化。</p>
+<ul>
+<li>语法糖优化: 比如将 async/await转换成基于 Future 实现</li>
+<li>Tree-shaking : 从 kernel 产物中摘除未使用的 procedures、fields、classes，</li>
+<li>TFA优化: 全局分析类型流，并进行一些优化工作（比如简化参数传递)</li>
+</ul>
+<h2 id="AST序列化为dill"><a href="#AST序列化为dill" class="headerlink" title="AST序列化为dill"></a>AST序列化为dill</h2><p>函数入口</p>
+<figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// import &#x27;package:front_end/src/fasta/kernel/utils.dart&#x27;</span></span><br><span class="line"><span class="built_in">List</span>&lt;<span class="built_in">int</span>&gt; serializeComponent(Component c) &#123;</span><br><span class="line">  ByteSink byteSink = <span class="keyword">new</span> ByteSink();</span><br><span class="line">  BinaryPrinter printer = <span class="keyword">new</span> BinaryPrinter(byteSink);</span><br><span class="line">  printer.writeComponentFile(c);</span><br><span class="line">  <span class="keyword">return</span> byteSink.builder.takeBytes();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>dill文件格式如下</p>
+<p><img src="/image/dart/dart_compiler_dill.jpg"></p>
+<ul>
+<li><code>Headerinfo</code> : 包含一些版本信息、hash、tag</li>
+<li><code>Metadata</code>: 大部分是基于TFA(type flow analysis)分析后产生<ul>
+<li><code>vm.call-site-attributes.metadata</code>: 一般用于接口型对象进行调用的时候注明实际调用对象的类型</li>
+<li><code>vm.direct-call.metadata</code> : 就是通过分析可以确认不存在虚函数调用的情况可以直接转为基于特定类型的调用</li>
+<li><code>vm.table-selector.metadata</code>: 用于生成dispatch table, 每个selector自身的index对应selector编号 (虚函数调用)</li>
+<li><code>vm.loading-units.metadata</code> 用于注明加载单元的信息. id和lib uri</li>
+</ul>
+</li>
+<li><code>Uri-source</code>: 记录到源码的映射 (行号、offset)</li>
+<li><code>Constant table</code> + ````Constant table index```<ul>
+<li> 常量表: 基本组成格式是 “ConstantTag”+”Constant value” </li>
+<li>常量表索引: 对应于常量表每个条目在文件中的位置。</li>
+</ul>
+</li>
+<li><code>LinkTable</code></li>
+<li><code>StringTable</code>:字符串常量表</li>
+<li><code>ComponentIndex</code>: 记录上述section的index和全局信息 </li>
+</ul>
+<h1 id="后端编译链路-GenSnapshot"><a href="#后端编译链路-GenSnapshot" class="headerlink" title="后端编译链路 GenSnapshot"></a>后端编译链路 GenSnapshot</h1><p><img src="/image/dart/dart_compiler_guide_cbe.jpg"></p>
+<p>入口<code>gen_snapshot</code></p>
+<ol>
+<li>加载kernel序列化ast: 处理元数据部分:包含所有 Class 和顶层 Procedure(即function),,内部ast不处理,设置为lazycompile, 用offset记录</li>
+<li>编译函数体,转化成中间指令表示IL : 从main函数(LazyCompile)开始, 编译直接/间接被 main 函数调用的其他函数,,得到FlowGraph,即IL中间指令</li>
+<li>平台无关指令优化 : 调用 CompilerPass::RunPipeline 执行一系列平台无关的优化，以求最终生成性能和体积俱佳的机器指令</li>
+<li>指令编译为机器码 : 将IL指令编译为具体平台的汇编(x86、x64、arm)</li>
+<li>将机器码序列化到文件中:  elf、snanshot、assembly</li>
+</ol>
+<h2 id="kernel加载过程"><a href="#kernel加载过程" class="headerlink" title="kernel加载过程"></a>kernel加载过程</h2><p>Program 类封装 kernel，再经由 KernelLoader 工具类 LoadLibrary 方法还原成 Library 对象（包含所有 Class 和顶层 Procedure）</p>
+<p><img src="/image/dart/dart_compiler_kernel_load.jpg"></p>
+<p>加载完成后,生成ast树, 之后编译器会将ast转化为IL表示</p>
+<blockquote>
+<p>IL定位是编译器通用设计中中间指令IR的概念,  类似于llvm或者kotlin compiler中的IR.</p>
+</blockquote>
+<h2 id="IL介绍"><a href="#IL介绍" class="headerlink" title="IL介绍"></a>IL介绍</h2><p>compiler pipeline 首先通过 FlowGraphBuilder 把 kernel 转换成 FlowGraph. 即IL. IL本质上是一种线性结构，它由一系列基本的指令(Instruction)组成，表示一个函数的运行过程. 一个或多个指令按顺序排列在一起，构成一个块(Block)。块的最后一条指令可能是一个跳转指令（包括条件跳转和无条件跳转），指向其他块；或者是一条Return指令，表示退出函数。</p>
+<p><img src="/image/dart/dart_compiler_il.jpg"></p>
+<p>Instruction指的是非BlockEntryInstr的子类, BlockEntryInstr分为好几种类型:(这一套机制主要作用是用来做流分析和优化工作的，做一些限制可以简化分析过程)</p>
+<ul>
+<li>GraphEntryInstr:  任何一个函数的起始都是一个GraphEntryInstr,不包括任何实际机器码.拥有一到三个后继，每一个后继都是函数的一个入口点，包括：<ul>
+<li>normal entry：函数正常入口点，这个入口点是每个函数都具备的。</li>
+<li>unchecked entry: 未检查入口点，从这个入口点进入，会首先执行检查参数类型代码，然后再执行函数体，这个入口点是可选的。</li>
+<li>osr entry: OSR=on stack replacement 入口点是可选的。</li>
+</ul>
+</li>
+<li>FunctionEntryInstr: 函数入口点,normal entry和unchecked entry都是这个类型</li>
+<li>OsrEntryInstr osr entry:   osr entry入口点是这个类型</li>
+<li>JoinEntryInstr: 无条件跳转指令目标块,多个不同块的无条件跳转指令跳转到同一个JoinEntryInstr是允许的。(类似goto的label)</li>
+<li>TargetEntryInstr:  条件跳转指令的目标块 (类似if else)</li>
+<li>CatchBlockEntryInstr:  catch语句块</li>
+</ul>
+<h2 id="IL优化"><a href="#IL优化" class="headerlink" title="IL优化"></a>IL优化</h2><p>编译器得到 FlowGraph 后，调用 CompilerPass::RunPipeline 执行一系列平台无关的优化，以求最终生成性能和体积俱佳的机器指令</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// compiler_pass.cc</span></span><br><span class="line"><span class="function">FlowGraph* <span class="title">CompilerPass::RunPipeline</span><span class="params">(PipelineMode mode, CompilerPassState* pass_state)</span> </span>&#123;</span><br><span class="line">  <span class="built_in">INVOKE_PASS</span>(Inlining);</span><br><span class="line">  <span class="built_in">INVOKE_PASS</span>(BranchSimplify);</span><br><span class="line">  <span class="built_in">INVOKE_PASS</span>(IfConvert);</span><br><span class="line">  <span class="comment">//...</span></span><br><span class="line">  <span class="comment">// Repeat branches optimization after DCE, as it could make more</span></span><br><span class="line">  <span class="comment">// empty blocks.</span></span><br><span class="line">  <span class="built_in">INVOKE_PASS</span>(OptimizeBranches);</span><br><span class="line">  <span class="built_in">INVOKE_PASS</span>(DCE);</span><br><span class="line">  <span class="keyword">return</span> pass_state-&gt;<span class="built_in">flow_graph</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Constant_folding">ConstantPropagation</a> 常量传播与折叠优化</li>
+<li><a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Inline_expansion">Inlining</a>（函数内联优化）</li>
+<li>CallSpecializer (函数调用特化）</li>
+</ul>
+<h3 id="ConstantPropagation（常量传播与折叠优化）"><a href="#ConstantPropagation（常量传播与折叠优化）" class="headerlink" title="ConstantPropagation（常量传播与折叠优化）"></a>ConstantPropagation（常量传播与折叠优化）</h3><p>demo</p>
+<figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">ConstProp() &#123;</span><br><span class="line">  <span class="built_in">int</span> x = <span class="number">14</span>;</span><br><span class="line">  <span class="keyword">var</span> y = <span class="number">7</span> - x / <span class="number">2</span>;</span><br><span class="line">  <span class="keyword">return</span> y * (<span class="number">28</span> / x + <span class="number">2</span>);     <span class="comment">// return 0;</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>未优化 IR：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">% </span><span class="language-bash">dart --print_flow_graph abc.dart</span></span><br><span class="line">...</span><br><span class="line">*** BEGIN CFG</span><br><span class="line">Unoptimized Compilation</span><br><span class="line">==== file:///.../abc.dart_::_ConstProp (RegularFunction)</span><br><span class="line">B0[graph]:0</span><br><span class="line">B1[function entry]:2</span><br><span class="line">    CheckStackOverflow:8(stack=0, loop=0)</span><br><span class="line">    DebugStepCheck:10()</span><br><span class="line">    DebugStepCheck:12()</span><br><span class="line">    t0 &lt;- Constant(#14)</span><br><span class="line">    StoreLocal(x @-1, t0)</span><br><span class="line">    t0 &lt;- Constant(#7)</span><br><span class="line">    t1 &lt;- LoadLocal(x @-1)</span><br><span class="line">    t2 &lt;- Constant(#2)</span><br><span class="line">    t1 &lt;- InstanceCall:14( /&lt;0&gt;, t1, t2)</span><br><span class="line">    t0 &lt;- InstanceCall:16( -&lt;0&gt;, t0, t1)</span><br><span class="line">    StoreLocal(y @-2, t0)</span><br><span class="line">    t0 &lt;- LoadLocal(y @-2)</span><br><span class="line">    t1 &lt;- Constant(#28)</span><br><span class="line">    t2 &lt;- LoadLocal(x @-1)</span><br><span class="line">    t1 &lt;- InstanceCall:18( /&lt;0&gt;, t1, t2)</span><br><span class="line">    t2 &lt;- Constant(#2)</span><br><span class="line">    t1 &lt;- InstanceCall:20( +&lt;0&gt;, t1, t2)</span><br><span class="line">    t0 &lt;- InstanceCall:22( *&lt;0&gt;, t0, t1)</span><br><span class="line">    DebugStepCheck:24()</span><br><span class="line">    Return:26(t0)</span><br><span class="line">*** END CFG</span><br></pre></td></tr></table></figure>
+<p>优化ir</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">% </span><span class="language-bash">dart --print_flow_graph_optimized --print-flow-graph-filter=ConstProp --optimization_counter_threshold=1 --no-background-compilation abc.dart</span></span><br><span class="line">...</span><br><span class="line">*** BEGIN CFG</span><br><span class="line">After AllocateRegisters</span><br><span class="line">==== file:///.../abc.dart_::_ConstProp (RegularFunction)</span><br><span class="line">  0: B0[graph]:0 &#123;</span><br><span class="line">      v44 &lt;- Constant(#0.0) T&#123;_Double&#125;</span><br><span class="line">&#125;</span><br><span class="line">  2: B1[function entry]:2</span><br><span class="line">  3:     ParallelMove rax &lt;- C</span><br><span class="line">  4:     Return:26(v44)</span><br><span class="line">*** END CFG</span><br></pre></td></tr></table></figure>
+<h3 id="Inlining（函数内联优化）"><a href="#Inlining（函数内联优化）" class="headerlink" title="Inlining（函数内联优化）"></a>Inlining（函数内联优化）</h3><figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">int</span> Add(<span class="built_in">int</span> a, <span class="built_in">int</span> b) &#123;</span><br><span class="line">  <span class="keyword">return</span> a + b;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">void</span> main() &#123;</span><br><span class="line">  <span class="built_in">print</span>(Add(<span class="number">100</span>, <span class="number">200</span>));   <span class="comment">// print(300)</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>未优化ir</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">% </span><span class="language-bash">dart --print_flow_graph add.dart</span></span><br><span class="line">...</span><br><span class="line">*** BEGIN CFG</span><br><span class="line">Unoptimized Compilation</span><br><span class="line">==== file:///.../add.dart_::_main (RegularFunction)</span><br><span class="line">B0[graph]:0</span><br><span class="line">B1[function entry]:2</span><br><span class="line">    CheckStackOverflow:8(stack=0, loop=0)</span><br><span class="line">    DebugStepCheck:10()</span><br><span class="line">    t0 &lt;- Constant(#100)</span><br><span class="line">    t1 &lt;- Constant(#200)</span><br><span class="line">    t0 &lt;- StaticCall:12( Add&lt;0&gt; t0, t1)</span><br><span class="line">    StaticCall:14( print&lt;0&gt; t0)</span><br><span class="line">    t0 &lt;- Constant(#null)</span><br><span class="line">    DebugStepCheck:16()</span><br><span class="line">    Return:18(t0)</span><br><span class="line">*** END CFG</span><br><span class="line">*** BEGIN CFG</span><br><span class="line">Unoptimized Compilation</span><br><span class="line">==== file:///.../add.dart_::_Add (RegularFunction)</span><br><span class="line">B0[graph]:0</span><br><span class="line">B1[function entry]:2</span><br><span class="line">    CheckStackOverflow:8(stack=0, loop=0)</span><br><span class="line">    DebugStepCheck:10()</span><br><span class="line">    t0 &lt;- LoadLocal(a @2)</span><br><span class="line">    t1 &lt;- LoadLocal(b @1)</span><br><span class="line">    t0 &lt;- InstanceCall:12( +&lt;0&gt;, t0, t1)</span><br><span class="line">    DebugStepCheck:14()</span><br><span class="line">    Return:16(t0)</span><br><span class="line">*** END CFG</span><br></pre></td></tr></table></figure>
+
+<p>优化ir</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">% </span><span class="language-bash">dart pkg/vm/bin/gen_kernel.dart --platform vm_platform_strong.dill --tfa --aot -o add.dill add.dart</span></span><br><span class="line"><span class="meta prompt_">% </span><span class="language-bash">gen_snapshot --snapshot_kind=app-aot-elf --print_flow_graph_optimized --print-flow-graph-filter=main --elf=add.aot add.dill</span></span><br><span class="line">...</span><br><span class="line">*** BEGIN CFG</span><br><span class="line">After AllocateRegisters</span><br><span class="line">==== file:///.../add.dart_::_main (RegularFunction)</span><br><span class="line">  0: B0[graph]:0 &#123;</span><br><span class="line">      v0 &lt;- Constant(#null) T&#123;Null?&#125;</span><br><span class="line">      v11 &lt;- Constant(#300) [300, 300] T&#123;_Smi&#125;</span><br><span class="line">&#125;</span><br><span class="line">  2: B1[function entry]:2</span><br><span class="line">  4:     CheckStackOverflow:8(stack=0, loop=0)</span><br><span class="line">  6:     PushArgument(v11)</span><br><span class="line">  8:     StaticCall:14( print&lt;0&gt; v11)</span><br><span class="line">  9:     ParallelMove rax &lt;- C</span><br><span class="line"> 10:     Return:18(v0)</span><br><span class="line">*** END CFG</span><br></pre></td></tr></table></figure>
+
+<h2 id="IL生成机器码"><a href="#IL生成机器码" class="headerlink" title="IL生成机器码"></a>IL生成机器码</h2><p>FlowGraph 经过众多 Pipeline 优化后交给 CompilerPass::GenerateCode 生成机器指令，GenerateCode 通过 FlowGraphCompiler 类遍历 FlowGraph 所有指令块 Block，每个 Block 包含若干条 Instruction，每条 Instruction 可以生成（lowering）相应的若干条机器指令</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// flow_graph_compiler.cc</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">FlowGraphCompiler::CompileGraph</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="built_in">InitCompiler</span>();</span><br><span class="line">  <span class="built_in">VisitBlocks</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">FlowGraphCompiler::VisitBlocks</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="built_in">set_current_block</span>(entry);</span><br><span class="line">    <span class="built_in">set_current_instruction</span>(entry);</span><br><span class="line">    entry-&gt;<span class="built_in">EmitNativeCode</span>(<span class="keyword">this</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>CallSpecializer 指令生成阶段(x64平台)：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// il_x64.cc</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">BinaryInt64OpInstr::EmitNativeCode</span><span class="params">(FlowGraphCompiler* compiler)</span> </span>&#123;</span><br><span class="line">  <span class="type">const</span> Location left = <span class="built_in">locs</span>()-&gt;<span class="built_in">in</span>(<span class="number">0</span>);</span><br><span class="line">  <span class="type">const</span> Location right = <span class="built_in">locs</span>()-&gt;<span class="built_in">in</span>(<span class="number">1</span>);</span><br><span class="line">  <span class="type">const</span> Location out = <span class="built_in">locs</span>()-&gt;<span class="built_in">out</span>(<span class="number">0</span>);</span><br><span class="line">  <span class="built_in">EmitInt64Arithmetic</span>(compiler, <span class="built_in">op_kind</span>(), left.<span class="built_in">reg</span>(), right.<span class="built_in">reg</span>());</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> OperandType&gt;</span><br><span class="line"><span class="function"><span class="type">static</span> <span class="type">void</span> <span class="title">EmitInt64Arithmetic</span><span class="params">(FlowGraphCompiler* compiler, Token::Kind op_kind, Register left, <span class="type">const</span> OperandType&amp; right)</span> </span>&#123;</span><br><span class="line">  <span class="keyword">switch</span> (op_kind) &#123;</span><br><span class="line">    <span class="keyword">case</span> Token::kADD:</span><br><span class="line">      <span class="function">__ <span class="title">addq</span><span class="params">(left, right)</span></span>;</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> Token::kSUB:</span><br><span class="line">      <span class="function">__ <span class="title">subq</span><span class="params">(left, right)</span></span>;</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> Token::kMUL:</span><br><span class="line">      <span class="function">__ <span class="title">imulq</span><span class="params">(left, right)</span></span>;</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在代码生成最后的阶段，针对当前编译的函数，虚拟机创建相应的 Instructions 对象和 Code 对象，为机器指令分配可执行内存，最后 Attach 到 Function 对象，设置 entry 属性。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// object.cc</span></span><br><span class="line"><span class="function">CodePtr <span class="title">Code::FinalizeCode</span><span class="params">(FlowGraphCompiler* compiler, compiler::Assembler* assembler, PoolAttachment pool_attachment, <span class="type">bool</span> optimized, CodeStatistics* stats <span class="comment">/* = nullptr */</span>)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// Hook up Code and Instructions objects.</span></span><br><span class="line">    code.<span class="built_in">set_instructions</span>(instrs);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Function::SetInstructionsSafe</span><span class="params">(<span class="type">const</span> Code&amp; value)</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">  <span class="built_in">untag</span>()-&gt;<span class="built_in">set_code</span>(value.<span class="built_in">ptr</span>());</span><br><span class="line">  <span class="built_in">StoreNonPointer</span>(&amp;<span class="built_in">untag</span>()-&gt;entry_point_, value.<span class="built_in">EntryPoint</span>());</span><br><span class="line">  <span class="built_in">StoreNonPointer</span>(&amp;<span class="built_in">untag</span>()-&gt;unchecked_entry_point_, value.<span class="built_in">UncheckedEntryPoint</span>());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="代码序列化"><a href="#代码序列化" class="headerlink" title="代码序列化"></a>代码序列化</h2><p>编译后的代码分成两部分: </p>
+<ul>
+<li>数据段: 存储一些静态变量、类信息,虚拟机只read这部分数据.</li>
+<li>代码段: 机器码运行指令Instruction,即机器码运行指令(x86、x64),虚拟机excute需要可执行权限.<br>AOT产物(app.so)中,数据段存在于 _kDartVmSnapshotData、_kDartIsolateSnapshotData.代码段存在于_kDartVmSnapshotInstructions、_kDartIsolateSnapshotInstructions<br>为了运行机器码，运行时必须掌握每一段机器码Instruction的内存位置。因此，在数据区必须记录机器码的位置信息。记录机器码位置信息的对象是Code对象。所以总体的数据格式大致如下</li>
+</ul>
+<p><img src="/image/dart/dart_compiler_code_instruction.jpg"></p>
+<p>Code对象与记录机器码位置有关的主要成员有以下两个：</p>
+<ul>
+<li>entry_point_ 记录Code对象对应的机器码在内存中的位置</li>
+<li>instructions_: Instructions类型的对象，指向包含机器码的Instructions对象 (还有monorphic_entry_point_等其他三个) </li>
+</ul>
+<h3 id="数据段序列化"><a href="#数据段序列化" class="headerlink" title="数据段序列化"></a>数据段序列化</h3><p>数据段主要格式如下</p>
+<ul>
+<li>Header数据区: 存储一些校验、版本、feature等等额外信息</li>
+<li>对象数据区: 存储真代码相关的信息: 类型信息、字符串等等</li>
+</ul>
+<p>Header数据格式</p>
+<p>对象数据区数据格式</p>
+<p>对象序列化的并不复杂, 如果想要序列化对象A：</p>
+<ol>
+<li>收集到A直接或间接引用到的所有对象（包括A)</li>
+<li>为每个对象分配一个id</li>
+<li>将所有对象按id顺序序列化到流中，序列化数据应包括对象的类型（以cid表示)和对象的每一个成员。对于引用类型的成员，以被引用对象的的id代替。</li>
+<li>序列化A的id到流的末尾。</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th align="left">字段</th>
+<th align="left">长度(字节)</th>
+<th align="left">备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">magic</td>
+<td align="left">4</td>
+<td align="left">0xdcdcf5f5</td>
+</tr>
+<tr>
+<td align="left">length</td>
+<td align="left">4</td>
+<td align="left">Snapshot数据总长度</td>
+</tr>
+<tr>
+<td align="left">kind</td>
+<td align="left">8</td>
+<td align="left">值为下列数值之一： FullFullCore/FullJIT/FullAOT/None/Invalid,在AOT模式下，kind的值总是FullAOT</td>
+</tr>
+<tr>
+<td align="left">version</td>
+<td align="left">32</td>
+<td align="left">32字节长的hash字符串（无终结符）。其hash值依据下列文件内容计算：<code>app_snapshot.h snapshot.cc object.cc</code> ….</td>
+</tr>
+<tr>
+<td align="left">length</td>
+<td align="left">n</td>
+<td align="left">feature字符串（以0为终结符）。其内容包含: 编译版本、vm全局选项、isolate group选项(enable_asserts) 、abi信息、指针压缩选项、null-safety选项</td>
+</tr>
+</tbody></table>
+<p>Serialize方法的实现核心为代码，大致分为以下几步：</p>
+<ol>
+<li>添加基础对象，并为基础对象分配id</li>
+<li>根据根对象搜索所有需要被序列化的对象，按cid(class)分类,放入对应的SerializationCluster中</li>
+<li>写入头部区 : 对象个数、instructions table的长度、cluster数量等等</li>
+<li>为被序列化对象分配id，并写入分配信息区</li>
+<li>写入填充信息区: 写入分配好的序列化详细信息</li>
+<li>写入根对象区</li>
+</ol>
+<p><img src="/image/dart/dart_compiler_cbe_serialize_code.jpg"></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">Serializer::Serialize</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="comment">//1. 添加基础对象，并为基础对象分配id；</span></span><br><span class="line">    roots-&gt;<span class="built_in">AddBaseObjects</span>(<span class="keyword">this</span>);</span><br><span class="line">    <span class="comment">//2.根据根对象搜索所有需要被序列化的对象，按cid(class)分类；</span></span><br><span class="line">    roots-&gt;<span class="built_in">PushRoots</span>(<span class="keyword">this</span>); </span><br><span class="line">    <span class="comment">//3. 写入头部区</span></span><br><span class="line">    <span class="built_in">WriteUnsigned</span>(num_objects); <span class="comment">// 写入对象总数</span></span><br><span class="line">    <span class="built_in">WriteUnsigned</span>(clusters.<span class="built_in">length</span>()); <span class="comment">// 写入cluster数量</span></span><br><span class="line">    <span class="built_in">WriteUnsigned</span>(instructions_table_len_);  <span class="comment">// 写入instructions table的长度</span></span><br><span class="line">    <span class="comment">//4. 为被序列化对象分配id，并写入分配信息区</span></span><br><span class="line">    <span class="keyword">for</span> (SerializationCluster* cluster : clusters) &#123;</span><br><span class="line">         cluster-&gt;<span class="built_in">WriteAndMeasureAlloc</span>(<span class="keyword">this</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//5. 序列化填充信息区</span></span><br><span class="line">    <span class="keyword">for</span> (SerializationCluster* cluster : clusters) &#123;</span><br><span class="line">        cluster-&gt;<span class="built_in">WriteAndMeasureFill</span>(<span class="keyword">this</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//6. 序列化根对象区</span></span><br><span class="line">    roots-&gt;<span class="built_in">WriteRoots</span>(<span class="keyword">this</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="机器码序列化"><a href="#机器码序列化" class="headerlink" title="机器码序列化"></a>机器码序列化</h3><p>Code对象和机器码的关系至少有两种：</p>
+<ol>
+<li>Code对象以instructions_成员持有Instructions对象，entry_point_指向Instructions中的机器码位置</li>
+<li>Code对象不持有Instructions对象引用（instructions_成员为空)，entry_point_指向代码段中的机器码位置<br>在JIT模式下，以及在AOT编译阶段，机器码显然保存在分配自堆中的Instructions对象中; 在AOT模式下, Code对象本身会被序列化到数据段中，其中entry_point_以对应机器码相对于代码段的偏移量代替</li>
+</ol>
+<p><img src="/image/dart/dart_compiler_serialize.jpg"></p>
+<p>序列化过程</p>
+<ol>
+<li>按正常流程序列化Code对象中除Instructions和entry_point_之外的其他信息</li>
+<li>把Instructions对象序列化到代码段，可以序列化整个Instructions对象，或者只序列化机器码部分。</li>
+<li>得到Instructions对象在代码段中的偏移量，在Code的填充信息区记录该偏移量</li>
+</ol>
+<p>序列化过程中的一些细节:</p>
+<ol>
+<li>dedup优化: 如果发现两个或者多个函数的机器码完全一样，删除多余的机器码，公用同一份机器码</li>
+<li>instructions table: 根据PC寄存器的值反查当前Code对象. 将所有Code对象搜集为一个列表。为了提高搜索效率，要求Code对象按照其机器码的内存位置的顺序排列，以便采用二分法高效搜索。  dedup优化的存在打破了以上的前提，Code对象的序列化顺序不再和机器码顺序严格一致。为此，在序列化之前，还需要做一个排序操作，让共享同一份Instructions对象的Code对象排列在一起</li>
+<li>基于pc相对位置的函数调用:  在AOT模式下，为了提高运行效率，对静态函数调用会采用基于pc相对位置跳转的方式.在序列化之前，机器码在代码区的布局还没有确定, 在编译时需要写入一个假的偏移量，序列化过程中需要计算真实的偏移量去替换。</li>
+</ol>
+<p> 机器码序列化/反序列化的主要相关类是CodeSerializationCluster和CodeDeserializationCluster。</p>
+<ol>
+<li>跟踪引用时记录Code对象<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//1. Code序列化第一步，仍然是在跟踪引用时记录Code对象。</span></span><br><span class="line"> odeSerializationCluster::<span class="built_in">Trace</span>()</span><br><span class="line"><span class="comment">//2. 在写入头部区之前，需要处理机器码排序、pc相对位置重定向等操作</span></span><br><span class="line">instructions_table_len_ = <span class="built_in">PrepareInstructions</span>();</span><br><span class="line"><span class="comment">//3. 分配信息写入 CodeSerializationCluster::WriteAlloc(Serializer* s)方法</span></span><br></pre></td></tr></table></figure></li>
+<li>在写入头部区之前，需要处理机器码排序、pc相对位置重定向等操作<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Serializer::Serialize方法</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">Serializer::PrepareInstructions</span><span class="params">(...)</span></span>&#123;</span><br><span class="line">    <span class="comment">//1. 机器码排序： 将共享同一个Instructions对象的Code排在一起</span></span><br><span class="line">    CodeSerializationCluster::<span class="built_in">Sort</span>(code_cluster_-&gt;<span class="built_in">objects</span>());</span><br><span class="line">    <span class="comment">//2. 处理pc偏移量调用重定向</span></span><br><span class="line">    <span class="comment">//据Code列表计算机器码布局</span></span><br><span class="line">    <span class="built_in">RelocateCodeObjects</span>(vm_, &amp;code_objects, &amp;writer_commands);</span><br><span class="line">    <span class="comment">//记录机器码布局, 后续序列化使用</span></span><br><span class="line">    image_writer_-&gt;<span class="built_in">PrepareForSerialization</span>(&amp;writer_commands);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li>写入分配信息<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// CodeSerializer::WriteAlloc(Serializer* s, CodePtr code)方法</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 为Code对象分配id</span></span><br><span class="line">s-&gt;<span class="built_in">AssignRef</span>(code);</span><br><span class="line"><span class="type">const</span> <span class="type">int32_t</span> state_bits = code-&gt;<span class="built_in">untag</span>()-&gt;state_bits_;</span><br><span class="line"><span class="comment">// 写入Code对象的state_bits标记</span></span><br><span class="line">s-&gt;<span class="built_in">Write</span>&lt;<span class="type">int32_t</span>&gt;(state_bits);</span><br></pre></td></tr></table></figure></li>
+<li>写入填充信息<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">CodeSerializationCluster::<span class="built_in">WriteFill</span>()&#123;</span><br><span class="line">    <span class="comment">// 写入机器码</span></span><br><span class="line">    s-&gt;<span class="built_in">WriteInstructions</span>(code);</span><br><span class="line">    <span class="comment">// 写入object pool的引用</span></span><br><span class="line">    <span class="built_in">WriteField</span>(code, object_pool_);</span><br><span class="line">    <span class="comment">//写入其他Code关联对象引用</span></span><br><span class="line">    <span class="built_in">WriteField</span>(code, xxx);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">// 首先获取Instructions对象在代码区的偏移量。</span></span><br><span class="line"><span class="comment">// GetTextOffsetFor方法会将instr对象添加到一个列表，并计算其在代码区的偏移量。如果已经</span></span><br><span class="line"><span class="comment">// 添加过，则直接返回其在代码区的偏移量。注意，use_bare_instructions模式下，由于在pc</span></span><br><span class="line"><span class="comment">// 偏移量调用重定向过程中已经决定了代码布局，Code对象已经被添加进列表，此时总是返回其偏移量</span></span><br><span class="line"><span class="comment">// 即可</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Serializer::WriteInstructions</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="comment">// 在use_bare_instructions模式下，对每个Code对象，序列化其相对于前一个Code对象在</span></span><br><span class="line">      <span class="comment">// 代码区的偏移量之差。另外序列化其unchecked偏移量和单态标记。</span></span><br><span class="line">    <span class="keyword">if</span> (FLAG_precompiled_mode &amp;&amp; FLAG_use_bare_instructions) &#123;</span><br><span class="line">        delta = xxx</span><br><span class="line">        <span class="built_in">WriteUnsigned</span>(delta);</span><br><span class="line">        <span class="built_in">WriteUnsigned</span>(payload_info);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 非use_bare_instructions模式下，直接序列化机器码偏移量和unchecked偏移量</span></span><br><span class="line">    <span class="built_in">Write</span>&lt;<span class="type">uint32_t</span>&gt;(offset);</span><br><span class="line">    <span class="built_in">WriteUnsigned</span>(unchecked_offset);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+done</li>
+</ol>
+
     </div>
 
     
@@ -296,6 +548,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A6%82%E8%A7%88"><span class="nav-number">1.</span> <span class="nav-text">概览</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Dart%E7%BC%96%E8%AF%91%E5%99%A8%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1"><span class="nav-number">2.</span> <span class="nav-text">Dart编译器架构设计</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91%E6%9E%B6%E6%9E%84"><span class="nav-number">2.1.</span> <span class="nav-text">编译架构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.2.</span> <span class="nav-text">编译模式:</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91%E4%BA%A7%E7%89%A9"><span class="nav-number">2.3.</span> <span class="nav-text">编译产物</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%89%8D%E7%AB%AF%E7%BC%96%E8%AF%91%E9%93%BE%E8%B7%AFCFE"><span class="nav-number">3.</span> <span class="nav-text">前端编译链路CFE</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%8D%E6%B3%95%E5%88%86%E6%9E%90"><span class="nav-number">3.1.</span> <span class="nav-text">词法分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%AD%E6%B3%95%E5%88%86%E6%9E%90"><span class="nav-number">3.2.</span> <span class="nav-text">语法分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AST%E6%A0%91%E6%9E%84%E5%BB%BA"><span class="nav-number">3.3.</span> <span class="nav-text">AST树构建</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E7%AB%AF%E7%BC%96%E8%AF%91%E4%BC%98%E5%8C%96"><span class="nav-number">3.4.</span> <span class="nav-text">前端编译优化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AST%E5%BA%8F%E5%88%97%E5%8C%96%E4%B8%BAdill"><span class="nav-number">3.5.</span> <span class="nav-text">AST序列化为dill</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%90%8E%E7%AB%AF%E7%BC%96%E8%AF%91%E9%93%BE%E8%B7%AF-GenSnapshot"><span class="nav-number">4.</span> <span class="nav-text">后端编译链路 GenSnapshot</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#kernel%E5%8A%A0%E8%BD%BD%E8%BF%87%E7%A8%8B"><span class="nav-number">4.1.</span> <span class="nav-text">kernel加载过程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#IL%E4%BB%8B%E7%BB%8D"><span class="nav-number">4.2.</span> <span class="nav-text">IL介绍</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#IL%E4%BC%98%E5%8C%96"><span class="nav-number">4.3.</span> <span class="nav-text">IL优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#ConstantPropagation%EF%BC%88%E5%B8%B8%E9%87%8F%E4%BC%A0%E6%92%AD%E4%B8%8E%E6%8A%98%E5%8F%A0%E4%BC%98%E5%8C%96%EF%BC%89"><span class="nav-number">4.3.1.</span> <span class="nav-text">ConstantPropagation（常量传播与折叠优化）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Inlining%EF%BC%88%E5%87%BD%E6%95%B0%E5%86%85%E8%81%94%E4%BC%98%E5%8C%96%EF%BC%89"><span class="nav-number">4.3.2.</span> <span class="nav-text">Inlining（函数内联优化）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#IL%E7%94%9F%E6%88%90%E6%9C%BA%E5%99%A8%E7%A0%81"><span class="nav-number">4.4.</span> <span class="nav-text">IL生成机器码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E5%BA%8F%E5%88%97%E5%8C%96"><span class="nav-number">4.5.</span> <span class="nav-text">代码序列化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%AE%B5%E5%BA%8F%E5%88%97%E5%8C%96"><span class="nav-number">4.5.1.</span> <span class="nav-text">数据段序列化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%BA%E5%99%A8%E7%A0%81%E5%BA%8F%E5%88%97%E5%8C%96"><span class="nav-number">4.5.2.</span> <span class="nav-text">机器码序列化</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
